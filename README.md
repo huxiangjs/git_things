@@ -1,2 +1,3 @@
-# git_things
-Let your device be controlled through git commit records.
+# Git Things
+* Let your device be controlled through git commit records.
+* Let’s forget about cloud servers! :-）
