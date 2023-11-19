@@ -23,11 +23,12 @@
 CROSS_COMPILE :=
 CC := $(CROSS_COMPILE)gcc
 
-C_FLAGS := -I../include
+C_FLAGS := -I../include \
+	   -I../third_party/zlib
 
 .PHONY: all clean
 
-OBJS := test_sha1
+OBJS := test_sha1 test_zlib
 
 all: $(OBJS)
 
@@ -35,5 +36,23 @@ clean:
 	rm -rf *.o *.a *.out $(OBJS)
 
 # Test for SHA1
-test_sha1: ../src/gitt_sha1.c test_sha1.c
+SHA1_SRCS := ../src/gitt_sha1.c test_sha1.c
+test_sha1: $(SHA1_SRCS)
+	$(CC) $(C_FLAGS) $^ -o $@
+
+# Test for zlib
+ZLIB_SRCS := test_zlib.c \
+	     ../third_party/zlib/adler32.c \
+	     ../third_party/zlib/crc32.c \
+	     ../third_party/zlib/deflate.c \
+	     ../third_party/zlib/infback.c \
+	     ../third_party/zlib/inffast.c \
+	     ../third_party/zlib/inflate.c \
+	     ../third_party/zlib/inftrees.c \
+	     ../third_party/zlib/trees.c \
+	     ../third_party/zlib/zutil.c \
+	     ../third_party/zlib/compress.c \
+	     ../third_party/zlib/uncompr.c
+
+test_zlib: $(ZLIB_SRCS)
 	$(CC) $(C_FLAGS) $^ -o $@

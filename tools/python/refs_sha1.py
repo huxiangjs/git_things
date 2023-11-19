@@ -1,7 +1,7 @@
 import hashlib
 
 if __name__ == '__main__':
-	byte_data = b'This is test string!'
+	byte_data = b'This is a string for testing!'
 	# print(byte_data)
 	sha1 = hashlib.sha1()
 	sha1.update(byte_data)

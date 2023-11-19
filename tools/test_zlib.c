@@ -24,56 +24,39 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <gitt_sha1.h>
-
-static void test_for_string(void)
-{
-	const char *str = "This is a string for testing!";
-	char hexdigest[41];
-	struct gitt_sha1 sha1;
-	int err;
-
-	gitt_sha1_init(&sha1);
-
-	err = gitt_sha1_update(&sha1, (uint8_t *)str, (uint32_t)strlen(str));
-	if (err)
-		printf("ERROR: %d\n", __LINE__);
-
-	err = gitt_sha1_hexdigest(&sha1, hexdigest);
-	if (err)
-		printf("ERROR: %d\n", __LINE__);
-
-	printf("STR SHA1: %s\n", hexdigest);
-}
-
-static void test_for_binary(void)
-{
-	uint8_t buffer[256] = {0};
-	char hexdigest[41];
-	struct gitt_sha1 sha1;
-	int err;
-	int i;
-
-	gitt_sha1_init(&sha1);
-
-	for (i = 0; i < 256; i++) {
-		buffer[i] = (uint8_t)i;
-		err = gitt_sha1_update(&sha1, buffer, (uint32_t)i + 1);
-		if (err)
-			printf("ERROR: %d\n", __LINE__);
-	}
-
-	err = gitt_sha1_hexdigest(&sha1, hexdigest);
-	if (err)
-		printf("ERROR: %d\n", __LINE__);
-
-	printf("BIN SHA1: %s\n", hexdigest);
-}
+#include <zlib.h>
 
 int main(int args, char *argv[])
 {
-	test_for_string();
-	test_for_binary();
+	Bytef tmp1[64] = "This is a string for testing!";
+	Bytef tmp2[64] = {0};
+	uLong tmp1_size;
+	uLong tmp2_size;
+	uLong i;
+	int retval;
+
+	printf("zlib version: %s\n", zlibVersion());
+
+	/* Compress */
+	tmp1_size = (uLong)strlen(tmp1);
+	tmp2_size = sizeof(tmp2);
+	retval = compress(tmp2, &tmp2_size, tmp1, tmp1_size);
+	if (!retval) {
+		for (i  = 0; i < tmp2_size; i++)
+			printf("%02x ", tmp2[i]);
+		printf("(%lubyte)\n", tmp2_size);
+	} else {
+		printf("compress error: %d\n", retval);
+	}
+
+	/* Uncompress */
+	tmp1_size = sizeof(tmp1);
+	memset(tmp1, 0, tmp1_size);
+	retval = uncompress(tmp1, &tmp1_size, tmp2, tmp2_size);
+	if (!retval)
+		printf("%s (%lubyte)\n", (char *)tmp1, tmp1_size);
+	else
+		printf("uncompress error: %d\n", retval);
 
 	return 0;
 }
