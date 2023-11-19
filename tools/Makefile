@@ -23,8 +23,8 @@
 CROSS_COMPILE :=
 CC := $(CROSS_COMPILE)gcc
 
-C_FLAGS := -I../include \
-	   -I../third_party/zlib
+CFLAGS := -I../include \
+	  -I../third_party/zlib
 
 .PHONY: all clean
 
@@ -38,7 +38,7 @@ clean:
 # Test for SHA1
 SHA1_SRCS := ../src/gitt_sha1.c test_sha1.c
 test_sha1: $(SHA1_SRCS)
-	$(CC) $(C_FLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@
 
 # Test for zlib
 ZLIB_SRCS := test_zlib.c \
@@ -55,4 +55,4 @@ ZLIB_SRCS := test_zlib.c \
 	     ../third_party/zlib/uncompr.c
 
 test_zlib: $(ZLIB_SRCS)
-	$(CC) $(C_FLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@
