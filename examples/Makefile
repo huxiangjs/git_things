@@ -53,7 +53,9 @@ EXAMPLES_SRCS := main.c \
 		 ../third_party/zlib/zutil.c \
 		 ../third_party/zlib/compress.c \
 		 ../third_party/zlib/uncompr.c \
-		 ../src/gitt_sha1.c
+		 ../src/gitt_sha1.c \
+		 ../src/gitt_unpack.c \
+		 ../src/gitt_obj.c
 
 examples: $(EXAMPLES_SRCS)
 	$(CC) $(CFLAGS) $^ $(LIBRARY) -o $@
