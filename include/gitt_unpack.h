@@ -44,6 +44,8 @@ struct gitt_unpack {
 	struct gitt_sha1 sha1;
 	uint8_t *buf;
 	uint16_t buf_len;
+	uint8_t *zbuf;
+	uint16_t zbuf_len;
 	gitt_obj_dump obj_dump;
 	uint32_t version;
 	uint32_t number;

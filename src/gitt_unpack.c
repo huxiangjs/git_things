@@ -36,7 +36,8 @@
  */
 int gitt_unpack_init(struct gitt_unpack *unpack)
 {
-	if (!unpack->buf || unpack->buf_len == 0) {
+	if (!unpack->buf || unpack->buf_len == 0 ||
+	    !unpack->zbuf || unpack->zbuf_len == 0) {
 		gitt_log_error("Buffer cannot be empty or length equal to 0\n");
 		return -1;
 	}
@@ -80,8 +81,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
 	uint8_t offset;
 	uint8_t index = 0;
 	uint16_t tmp;
-	Bytef buf[10240];
-	uLong buf_size;
+	uLong length;
 	int err;
 
 	if (unpack->valid_len <= 2)
@@ -117,7 +117,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
 	gitt_log_debug("Object size: %u\n", obj_size);
 	gitt_log_debug("Object offset: %u\n", unpack->offset);
 
-	if (obj_size > sizeof(buf) - index) {
+	if (obj_size > unpack->zbuf_len - index) {
 		gitt_log_error("Uncompress output buffer does not have enough space\n");
 		return -1;
 	}
@@ -137,19 +137,20 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
 	/* Try to uncompress */
 	tmp = index + 1;
 	while (tmp < unpack->valid_len) {
-		buf_size = sizeof(buf);
+		length = unpack->zbuf_len;
 
-		err = uncompress(buf, &buf_size, (Bytef *)(unpack->buf + index),
+		err = uncompress((Bytef *)unpack->zbuf, &length,
+				 (Bytef *)(unpack->buf + index),
 				 (uLong)(tmp - index));
 		/* Uncompress done */
 		if (!err) {
 			if (unpack->obj_dump) {
-				if (obj_size == buf_size) {
+				if (obj_size == length) {
 					struct gitt_obj obj;
 
 					obj.type = (uint8_t)obj_type;
-					obj.size = (uint16_t)obj_size;
-					obj.data = (char *)buf;
+					obj.size = (uint16_t)length;
+					obj.data = (char *)unpack->zbuf;
 
 					unpack->obj_dump(&obj);
 				} else {
