@@ -24,5 +24,5 @@
 
 const char *gitt_obj_types[] = {
 	"none", "commit", "tree", "blob",
-	"tag", "ofs_delta", "ref_delta", "none"
+	"tag", "none", "ofs_delta", "ref_delta"
 };

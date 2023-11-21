@@ -51,6 +51,7 @@ struct gitt_unpack {
 	gitt_unpack_verify verify;
 	uint16_t valid_len;
 	uint8_t state;
+	uint16_t offset;
 };
 
 int gitt_unpack_init(struct gitt_unpack *unpack);

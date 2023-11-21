@@ -48,6 +48,7 @@ int gitt_unpack_init(struct gitt_unpack *unpack)
 
 	unpack->valid_len = 0;
 	unpack->state = 0;
+	unpack->offset = 0;
 	gitt_sha1_init(&unpack->sha1);
 
 	return 0;
@@ -69,6 +70,7 @@ static void gitt_unpack_propel(struct gitt_unpack *unpack, uint16_t len)
 	}
 
 	unpack->valid_len -= len;
+	unpack->offset += len;
 }
 
 static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
@@ -78,7 +80,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
 	uint8_t offset;
 	uint8_t index = 0;
 	uint16_t tmp;
-	Bytef buf[1024];
+	Bytef buf[10240];
 	uLong buf_size;
 	int err;
 
@@ -91,6 +93,8 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
 		gitt_log_error("Invalid object type\n");
 		return -1;
 	}
+	gitt_log_debug("Object type: %s\n", gitt_obj_types[obj_type]);
+
 	obj_size = unpack->buf[index] & 0xf;
 	index++;
 
@@ -110,16 +114,31 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
 			gitt_log_error("Object too big\n");
 		return -1;
 	}
+	gitt_log_debug("Object size: %u\n", obj_size);
+	gitt_log_debug("Object offset: %u\n", unpack->offset);
 
 	if (obj_size > sizeof(buf) - index) {
 		gitt_log_error("Uncompress output buffer does not have enough space\n");
 		return -1;
 	}
 
+	/* We don't deal with OFS_DELTA, so we skip its special parts directly. */
+	if (obj_type == 6) {
+		/* Skip offset size */
+		while (index < unpack->valid_len && unpack->buf[index] & 0x80)
+			index++;
+
+		if (unpack->buf[index] & 0x80)
+			return -1;
+
+		index++;
+	}
+
 	/* Try to uncompress */
 	tmp = index + 1;
 	while (tmp < unpack->valid_len) {
 		buf_size = sizeof(buf);
+
 		err = uncompress(buf, &buf_size, (Bytef *)(unpack->buf + index),
 				 (uLong)(tmp - index));
 		/* Uncompress done */
