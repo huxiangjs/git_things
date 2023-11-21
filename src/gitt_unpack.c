@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
+#define DEBUG
 #include <string.h>
 #include <zlib.h>
 #include <gitt_unpack.h>
@@ -74,15 +74,81 @@ static void gitt_unpack_propel(struct gitt_unpack *unpack, uint16_t len)
 	unpack->offset += len;
 }
 
+#if 1
+static int gitt_unpack_try_uncompress(struct gitt_unpack *unpack,
+				      uint8_t *ibuf, uint16_t *ilen)
+{
+	uLong length;
+	uint16_t in_size = 3;
+	int err;
+
+	while (in_size < *ilen) {
+		length = unpack->zbuf_len;
+		err = uncompress((Bytef *)unpack->zbuf, &length,
+				 (Bytef *)ibuf,
+				 (uLong)in_size);
+		/* Uncompress done */
+		if (!err) {
+			*ilen = in_size;
+			return (int)length;
+		}
+		in_size++;
+	}
+
+	return -1;
+}
+#else
+static int gitt_unpack_try_uncompress(struct gitt_unpack *unpack,
+				      uint8_t *ibuf, uint16_t *ilen)
+{
+	uLong length;
+	uint16_t in_size;
+	uint16_t offset;
+	uint16_t blk_size;
+	int err;
+
+	in_size = *ilen;
+	blk_size = in_size;
+	offset = in_size >> 1;
+
+	while (blk_size) {
+		blk_size >>= 1;
+		length = unpack->zbuf_len;
+		err = uncompress((Bytef *)unpack->zbuf, &length,
+				 (Bytef *)ibuf,
+				 (uLong)offset);
+		if (!err) {
+			in_size = offset;
+			offset = in_size - blk_size;
+			continue;
+		}
+				
+		length = unpack->zbuf_len;
+		err = uncompress((Bytef *)unpack->zbuf, &length,
+				 (Bytef *)ibuf,
+				 (uLong)in_size);
+		if (err)
+			break;
+		offset += blk_size >> 1;
+	}
+
+	if (err)
+		return -1;
+
+	/* Uncompress okay */
+	*ilen = in_size;
+	return (int)length;
+}
+#endif
+
 static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
 {
-	uint32_t obj_size = 0;
+	uint32_t obj_size;
 	uint8_t obj_type;
 	uint8_t offset;
 	uint8_t index = 0;
-	uint16_t tmp;
-	uLong length;
-	int err;
+	uint16_t length;
+	int ret;
 
 	if (unpack->valid_len <= 2)
 		return -1;
@@ -135,34 +201,26 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
 	}
 
 	/* Try to uncompress */
-	tmp = index + 1;
-	while (tmp < unpack->valid_len) {
-		length = unpack->zbuf_len;
+	length = unpack->valid_len - index;
+	ret = gitt_unpack_try_uncompress(unpack, unpack->buf + index, &length);
+	if (ret >= 0) {
+		if (unpack->obj_dump) {
+			if (obj_size == ret) {
+				struct gitt_obj obj;
 
-		err = uncompress((Bytef *)unpack->zbuf, &length,
-				 (Bytef *)(unpack->buf + index),
-				 (uLong)(tmp - index));
-		/* Uncompress done */
-		if (!err) {
-			if (unpack->obj_dump) {
-				if (obj_size == length) {
-					struct gitt_obj obj;
+				obj.type = (uint8_t)obj_type;
+				obj.size = (uint16_t)ret;
+				obj.data = (char *)unpack->zbuf;
 
-					obj.type = (uint8_t)obj_type;
-					obj.size = (uint16_t)length;
-					obj.data = (char *)unpack->zbuf;
-
-					unpack->obj_dump(&obj);
-				} else {
-					gitt_log_error("The uncompress data size is inconsistent with that in the record\n");
-				}
+				unpack->obj_dump(&obj);
+			} else {
+				gitt_log_error("The uncompress data size is inconsistent with that in the record\n");
 			}
-
-			unpack->number--;
-			gitt_unpack_propel(unpack, tmp);
-			return 0;
 		}
-		tmp++;
+
+		unpack->number--;
+		gitt_unpack_propel(unpack, index + length);
+		return 0;
 	}
 
 	return -1;
