@@ -79,7 +79,7 @@
 static void gitt_obj_dump_callback(struct gitt_obj *obj)
 {
 	printf("%s: type:%s, size:%d\n", __func__, gitt_obj_types[obj->type], obj->size);
-	if (obj->type == 1)
+	if (obj->type == 1 || obj->type == 2)
 		printf("%.*s\n", obj->size, obj->data);
 }
 
@@ -103,12 +103,15 @@ static void gitt_unpack_verify_callback(bool pass, struct gitt_sha1 *sha1)
 static void test_unpack(uint8_t *buf, uint16_t len)
 {
 	struct gitt_unpack unpack = {0};
-	uint8_t buffer[4096];
+	uint8_t buffer[4096*2];
+	uint8_t zbuffer[4096*2];
 	uint16_t count;
 	int err;
 
 	unpack.buf = buffer;
 	unpack.buf_len = sizeof(buffer);
+	unpack.zbuf = zbuffer;
+	unpack.zbuf_len = sizeof(zbuffer);
 	unpack.obj_dump = gitt_obj_dump_callback;
 	unpack.work = gitt_unpack_work_callback;
 	unpack.verify = gitt_unpack_verify_callback;
@@ -129,7 +132,7 @@ static int test_unpack_from_file(void)
 	int err;
 	uint8_t buffer[40960];
 
-	file = fopen("../../git_impl/.git/objects/pack/pack-c901ded5d19bb4affeb9f8336653c12637f93cc7.pack", "rb");
+	file = fopen("../.git/objects/pack/pack-a52896a8b8e6e3f91c5a941653eb7add97b8ae82.pack", "rb");
 	if (!file)
 		return -1;
 	err = fread(buffer, 1, sizeof(buffer) - 1, file);
