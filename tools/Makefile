@@ -41,18 +41,18 @@ test_sha1: $(SHA1_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@
 
 # Test for zlib
-ZLIB_SRCS := test_zlib.c \
-	     ../third_party/zlib/adler32.c \
-	     ../third_party/zlib/crc32.c \
-	     ../third_party/zlib/deflate.c \
-	     ../third_party/zlib/infback.c \
-	     ../third_party/zlib/inffast.c \
-	     ../third_party/zlib/inflate.c \
-	     ../third_party/zlib/inftrees.c \
-	     ../third_party/zlib/trees.c \
-	     ../third_party/zlib/zutil.c \
-	     ../third_party/zlib/compress.c \
-	     ../third_party/zlib/uncompr.c
+ZLIB_SRCS := test_zlib.c
+ZLIB_SRCS += ../third_party/zlib/adler32.c
+ZLIB_SRCS += ../third_party/zlib/crc32.c
+ZLIB_SRCS += ../third_party/zlib/deflate.c
+# ZLIB_SRCS += ../third_party/zlib/infback.c
+ZLIB_SRCS += ../third_party/zlib/inffast.c
+ZLIB_SRCS += ../third_party/zlib/inflate.c
+ZLIB_SRCS += ../third_party/zlib/inftrees.c
+ZLIB_SRCS += ../third_party/zlib/trees.c
+ZLIB_SRCS += ../third_party/zlib/zutil.c
+# ZLIB_SRCS += ../third_party/zlib/compress.c
+# ZLIB_SRCS += ../third_party/zlib/uncompr.c
 
 test_zlib: $(ZLIB_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@
