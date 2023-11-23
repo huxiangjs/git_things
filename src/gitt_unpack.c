@@ -36,8 +36,7 @@
  */
 int gitt_unpack_init(struct gitt_unpack *unpack)
 {
-	if (!unpack->buf || unpack->buf_len == 0 ||
-	    !unpack->zbuf || unpack->zbuf_len == 0) {
+	if (!unpack->buf || unpack->buf_len == 0) {
 		gitt_log_error("Buffer cannot be empty or length equal to 0\n");
 		return -1;
 	}
@@ -47,102 +46,17 @@ int gitt_unpack_init(struct gitt_unpack *unpack)
 		return -1;
 	}
 
-	unpack->valid_len = 0;
-	unpack->state = 0;
-	unpack->offset = 0;
+	unpack->version = 0;
+	unpack->number = 0;
+	unpack->pack_state = 0;
 	gitt_sha1_init(&unpack->sha1);
 
 	return 0;
 }
 
-static void gitt_unpack_propel(struct gitt_unpack *unpack, uint16_t len)
-{
-	uint16_t copy_size = unpack->valid_len - len;
-	uint16_t index = 0;
-
-	if (len == 0)
-		return;
-
-	gitt_sha1_update(&unpack->sha1, unpack->buf, len);
-
-	while (index < copy_size) {
-		unpack->buf[index] = unpack->buf[index + len];
-		index++;
-	}
-
-	unpack->valid_len -= len;
-	unpack->offset += len;
-}
-
-#if 1
-static int gitt_unpack_try_uncompress(struct gitt_unpack *unpack,
-				      uint8_t *ibuf, uint16_t *ilen)
-{
-	uLong length;
-	uint16_t in_size = 3;
-	int err;
-
-	while (in_size < *ilen) {
-		length = unpack->zbuf_len;
-		err = uncompress((Bytef *)unpack->zbuf, &length,
-				 (Bytef *)ibuf,
-				 (uLong)in_size);
-		/* Uncompress done */
-		if (!err) {
-			*ilen = in_size;
-			return (int)length;
-		}
-		in_size++;
-	}
-
-	return -1;
-}
-#else
-static int gitt_unpack_try_uncompress(struct gitt_unpack *unpack,
-				      uint8_t *ibuf, uint16_t *ilen)
-{
-	uLong length;
-	uint16_t in_size;
-	uint16_t offset;
-	uint16_t blk_size;
-	int err;
-
-	in_size = *ilen;
-	blk_size = in_size;
-	offset = in_size >> 1;
-
-	while (blk_size) {
-		blk_size >>= 1;
-		length = unpack->zbuf_len;
-		err = uncompress((Bytef *)unpack->zbuf, &length,
-				 (Bytef *)ibuf,
-				 (uLong)offset);
-		if (!err) {
-			in_size = offset;
-			offset = in_size - blk_size;
-			continue;
-		}
-				
-		length = unpack->zbuf_len;
-		err = uncompress((Bytef *)unpack->zbuf, &length,
-				 (Bytef *)ibuf,
-				 (uLong)in_size);
-		if (err)
-			break;
-		offset += blk_size >> 1;
-	}
-
-	if (err)
-		return -1;
-
-	/* Uncompress okay */
-	*ilen = in_size;
-	return (int)length;
-}
-#endif
-
 static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
 {
+#if 0
 	uint32_t obj_size;
 	uint8_t obj_type;
 	uint8_t offset;
@@ -222,52 +136,85 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
 		gitt_unpack_propel(unpack, index + length);
 		return 0;
 	}
+#endif
 
 	return -1;
 }
 
-static int gitt_unpack_try_work(struct gitt_unpack *unpack)
+/**
+ * @brief Add data
+ *
+ * @param unpack handle
+ * @param data
+ * @param size
+ * @return int 0: Good
+ * @return int -1: Error
+ */
+int gitt_unpack_update(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
 {
-	switch (unpack->state) {
-	case 0:
-		if (unpack->valid_len < 12)
-			return -1;
-		/*
-		 * File header
-		 * | 4byte magic | 4byte version | 4byte mumber of objects |
-		 */
-		if (unpack->buf[0] != 'P' || unpack->buf[1] != 'A' ||
-		    unpack->buf[2] != 'C' || unpack->buf[3] != 'K') {
-			gitt_log_error("Not a valid pack file\n");
+	uint16_t index = 0;
+	int ret;
+	const char *magic = "PACK";
+
+	if (unpack->pack_state == 0xff)
+		return -1;
+
+	if (!size)
+		goto out;
+
+	/*
+	 * Using a state machine to parse byte by byte
+	 *
+	 * File header:
+	 * | 4byte magic | 4byte version | 4byte mumber of objects |
+	 */
+
+	/* state: 0 ~ 3 */
+	while (index < size && unpack->pack_state < 4) {
+		if (data[index] != magic[unpack->pack_state]) {
+			unpack->pack_state = 0xff;
 			return -1;
 		}
+		index++;
+		unpack->pack_state++;
+	}
 
-		unpack->version = unpack->buf[4] << 24 |
-				  unpack->buf[5] << 16 |
-				  unpack->buf[6] << 8 |
-				  unpack->buf[7];
-		unpack->number = unpack->buf[8] << 24 |
-				 unpack->buf[9] << 16 |
-				 unpack->buf[10] << 8 |
-				 unpack->buf[11];
+	/* state: 4 ~ 7 */
+	while (index < size && unpack->pack_state < 8) {
+		unpack->version <<= 8;
+		unpack->version |= data[index];
+		index++;
+		unpack->pack_state++;
+	}
 
-		gitt_unpack_propel(unpack, 12);
+	/* state: 8 ~ 11 */
+	while (index < size && unpack->pack_state < 12) {
+		unpack->number <<= 8;
+		unpack->number |= data[index];
+		index++;
+		unpack->pack_state++;
+	}
 
-		if (unpack->work)
-			unpack->work(unpack);
+	if (unpack->pack_state == 12 && unpack->work)
+		unpack->work(unpack);
 
-		unpack->state = 1;
-		break;
-	case 1:
+	// TODO: for test
+	if (unpack->pack_state == 12)
+		unpack->pack_state = 13;
+#if 0
+	case 12:
 		/* Unpack objects */
-		if(gitt_unpack_obj_step(unpack))
+		ret = gitt_unpack_obj_step(unpack);
+		if (ret < 0) {
+			unpack->pack_state = 14;
 			return -1;
+		} else if (ret > 0) {
+
+		}
 		if (!unpack->number)
-			unpack->state = 2;
+			unpack->pack_state = 2;
 		break;
-	case 2:
-		if (unpack->valid_len < 20)
-			return -1;
+	case 13:
 
 		/* 20byte SHA-1 */
 		if (unpack->verify) {
@@ -284,53 +231,14 @@ static int gitt_unpack_try_work(struct gitt_unpack *unpack)
 			unpack->verify(pass, &unpack->sha1);
 		}
 
-		unpack->state = 3;
-		gitt_unpack_propel(unpack, 20);
+		unpack->pack_state = 3;
+
 		break;
-	case 3:
+	case 14:
 		return -1;
 	}
+#endif
 
-	return 0;
-}
-
-/**
- * @brief Add data
- *
- * @param unpack handle
- * @param data
- * @param size
- * @return int 0: Good
- * @return int -1: Error
- */
-int gitt_unpack_update(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
-{
-	uint16_t copy_size;
-	uint16_t done_size = 0;
-	uint16_t valid_size = size;
-	int ret;
-
-	/* Copy and try */
-	do {
-		copy_size = unpack->buf_len - unpack->valid_len;
-		copy_size = valid_size < copy_size ? valid_size : copy_size;
-		memcpy(unpack->buf + unpack->valid_len, data + done_size, copy_size);
-		unpack->valid_len += copy_size;
-
-		ret = gitt_unpack_try_work(unpack);
-		if (unpack->valid_len == unpack->buf_len) {
-			gitt_log_error("Unpacking error, please increase buffer\n");
-			return -1;
-		}
-
-		done_size += copy_size;
-		valid_size -= copy_size;
-
-	} while (valid_size);
-
-	/* If ret is 0, we can continue to try */
-	while (!ret)
-		ret = gitt_unpack_try_work(unpack);
-
+out:
 	return 0;
 }

@@ -110,8 +110,6 @@ static void test_unpack(uint8_t *buf, uint16_t len)
 
 	unpack.buf = buffer;
 	unpack.buf_len = sizeof(buffer);
-	unpack.zbuf = zbuffer;
-	unpack.zbuf_len = sizeof(zbuffer);
 	unpack.obj_dump = gitt_obj_dump_callback;
 	unpack.work = gitt_unpack_work_callback;
 	unpack.verify = gitt_unpack_verify_callback;
@@ -119,10 +117,12 @@ static void test_unpack(uint8_t *buf, uint16_t len)
 
 	count = 0;
 	while (count < len) {
-		err = gitt_unpack_update(&unpack, buf + count, 128);
-		if (err)
+		err = gitt_unpack_update(&unpack, buf + count, 1);
+		if (err) {
+			printf("error: %u\n", unpack.pack_state);
 			break;
-		count += 128;
+		}
+		count += 1;
 	}
 }
 
@@ -133,8 +133,10 @@ static int test_unpack_from_file(void)
 	uint8_t buffer[40960];
 
 	file = fopen("../.git/objects/pack/pack-a52896a8b8e6e3f91c5a941653eb7add97b8ae82.pack", "rb");
-	if (!file)
+	if (!file) {
+		printf("file open error!\n");
 		return -1;
+	}
 	err = fread(buffer, 1, sizeof(buffer) - 1, file);
 	if (err <= 0) {
 		fclose(file);
