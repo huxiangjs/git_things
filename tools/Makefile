@@ -25,7 +25,9 @@ CC := $(CROSS_COMPILE)gcc
 
 CFLAGS := -I../include \
 	  -I../third_party/zlib \
-	  -DGITT_LOG_TO_STDIO
+	  -DGITT_LOG_TO_STDIO \
+	  -O2 \
+	  -Wall \
 
 .PHONY: all clean
 
