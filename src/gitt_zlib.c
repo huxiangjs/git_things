@@ -147,7 +147,7 @@ int gitt_zlib_decompress_update(struct gitt_zlib *zlib,
 	zlib->stream.next_out = (Bytef *)out;
 
 	ret = inflate(&zlib->stream, Z_NO_FLUSH);
-	if (ret != Z_OK && ret != Z_DATA_ERROR) {
+	if (ret != Z_OK && ret != Z_STREAM_END) {
 		gitt_zlib_check(ret);
 		*in_size = 0;
 		*out_size = 0;
@@ -159,7 +159,7 @@ int gitt_zlib_decompress_update(struct gitt_zlib *zlib,
 	gitt_log_debug("cost in +%u bytes\n", *in_size);
 	gitt_log_debug("cost out +%u bytes\n", *out_size);
 
-	return ret;
+	return 0;
 }
 
 void gitt_zlib_decompress_end(struct gitt_zlib *zlib)

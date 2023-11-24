@@ -21,11 +21,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#define DEBUG
+
 #include <string.h>
 #include <zlib.h>
 #include <gitt_unpack.h>
 #include <gitt_log.h>
+
+#define GITT_UNPACK_STATE_INIT		0x00
+#define GITT_UNPACK_STATE_STOP		0xff
 
 /**
  * @brief Initialization handle
@@ -36,150 +39,46 @@
  */
 int gitt_unpack_init(struct gitt_unpack *unpack)
 {
-	if (!unpack->buf || unpack->buf_len == 0) {
-		gitt_log_error("Buffer cannot be empty or length equal to 0\n");
+	if (!unpack->buf || unpack->buf_len < 20) {
+		gitt_log_error("Buffe cannot be empty and the length cannot be less than 20\n");
 		return -1;
 	}
 
-	if (!unpack->obj_dump) {
-		gitt_log_error("obj_dump cannot be empty\n");
-		return -1;
-	}
-
-	unpack->version = 0;
-	unpack->number = 0;
-	unpack->pack_state = 0;
+	unpack->pack_state = GITT_UNPACK_STATE_INIT;
+	unpack->obj_state = GITT_UNPACK_STATE_INIT;
 	gitt_sha1_init(&unpack->sha1);
 
 	return 0;
 }
 
-static int gitt_unpack_obj_step(struct gitt_unpack *unpack)
+static int gitt_unpack_header_step(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
 {
-#if 0
-	uint32_t obj_size;
-	uint8_t obj_type;
-	uint8_t offset;
-	uint8_t index = 0;
-	uint16_t length;
-	int ret;
-
-	if (unpack->valid_len <= 2)
-		return -1;
-
-	/* Object type */
-	obj_type = unpack->buf[index] >> 4 & 0x7;
-	if (!obj_type) {
-		gitt_log_error("Invalid object type\n");
-		return -1;
-	}
-	gitt_log_debug("Object type: %s\n", gitt_obj_types[obj_type]);
-
-	obj_size = unpack->buf[index] & 0xf;
-	index++;
-
-	/* Object size */
-	offset = 4;
-	while ((index < 5) && (index < unpack->valid_len) &&
-	       (unpack->buf[index - 1] & 0x80)) {
-		obj_size |= (unpack->buf[index] & 0x7f) << offset;
-		offset += 7;
-		index++;
-	}
-
-	if (unpack->buf[index - 1] & 0x80) {
-		if (index < 5)
-			gitt_log_debug("Need more data\n");
-		else
-			gitt_log_error("Object too big\n");
-		return -1;
-	}
-	gitt_log_debug("Object size: %u\n", obj_size);
-	gitt_log_debug("Object offset: %u\n", unpack->offset);
-
-	if (obj_size > unpack->zbuf_len - index) {
-		gitt_log_error("Uncompress output buffer does not have enough space\n");
-		return -1;
-	}
-
-	/* We don't deal with OFS_DELTA, so we skip its special parts directly. */
-	if (obj_type == 6) {
-		/* Skip offset size */
-		while (index < unpack->valid_len && unpack->buf[index] & 0x80)
-			index++;
-
-		if (unpack->buf[index] & 0x80)
-			return -1;
-
-		index++;
-	}
-
-	/* Try to uncompress */
-	length = unpack->valid_len - index;
-	ret = gitt_unpack_try_uncompress(unpack, unpack->buf + index, &length);
-	if (ret >= 0) {
-		if (unpack->obj_dump) {
-			if (obj_size == ret) {
-				struct gitt_obj obj;
-
-				obj.type = (uint8_t)obj_type;
-				obj.size = (uint16_t)ret;
-				obj.data = (char *)unpack->zbuf;
-
-				unpack->obj_dump(&obj);
-			} else {
-				gitt_log_error("The uncompress data size is inconsistent with that in the record\n");
-			}
-		}
-
-		unpack->number--;
-		gitt_unpack_propel(unpack, index + length);
-		return 0;
-	}
-#endif
-
-	return -1;
-}
-
-/**
- * @brief Add data
- *
- * @param unpack handle
- * @param data
- * @param size
- * @return int 0: Good
- * @return int -1: Error
- */
-int gitt_unpack_update(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
-{
-	uint16_t index = 0;
-	int ret;
 	const char *magic = "PACK";
-
-	if (unpack->pack_state == 0xff)
-		return -1;
-
-	if (!size)
-		goto out;
+	uint16_t index = 0;
 
 	/*
-	 * Using a state machine to parse byte by byte
-	 *
 	 * File header:
 	 * | 4byte magic | 4byte version | 4byte mumber of objects |
 	 */
 
-	/* state: 0 ~ 3 */
+	/* State: 0  (Initialization) */
+	if (unpack->pack_state == 0) {
+		unpack->version = 0;
+		unpack->number = 0;
+	}
+
+	/* State: 0 ~ 3  (4byte magic) */
 	while (index < size && unpack->pack_state < 4) {
 		if (data[index] != magic[unpack->pack_state]) {
-			unpack->pack_state = 0xff;
+			unpack->pack_state = GITT_UNPACK_STATE_STOP;
+			gitt_log_error("File format is incorrect\n");
 			return -1;
 		}
 		index++;
 		unpack->pack_state++;
 	}
 
-	/* state: 4 ~ 7 */
+	/* State: 4 ~ 7  (4byte version) */
 	while (index < size && unpack->pack_state < 8) {
 		unpack->version <<= 8;
 		unpack->version |= data[index];
@@ -187,7 +86,7 @@ int gitt_unpack_update(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
 		unpack->pack_state++;
 	}
 
-	/* state: 8 ~ 11 */
+	/* State: 8 ~ 11  (4byte mumber of objects) */
 	while (index < size && unpack->pack_state < 12) {
 		unpack->number <<= 8;
 		unpack->number |= data[index];
@@ -195,50 +94,249 @@ int gitt_unpack_update(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
 		unpack->pack_state++;
 	}
 
-	if (unpack->pack_state == 12 && unpack->work)
-		unpack->work(unpack);
+	/* Callback */
+	if (unpack->pack_state == 12 && unpack->header_dump)
+		unpack->header_dump(&unpack->version, &unpack->number);
 
-	// TODO: for test
-	if (unpack->pack_state == 12)
-		unpack->pack_state = 13;
-#if 0
-	case 12:
-		/* Unpack objects */
-		ret = gitt_unpack_obj_step(unpack);
-		if (ret < 0) {
-			unpack->pack_state = 14;
-			return -1;
-		} else if (ret > 0) {
+	return index;
+}
 
+static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
+{
+	uint16_t index = 0;
+	uint16_t in_size;
+	uint16_t out_size;
+	int ret;
+
+	do {
+		/* First byte:   | 1bit flag | 3bit type | 4bit length | */
+		if (index < size && unpack->obj_state == 0) {
+			ret = gitt_zlib_decompress_init(&unpack->zlib);
+			if (ret) {
+				unpack->pack_state = GITT_UNPACK_STATE_STOP;
+				return ret;
+			}
+			unpack->valid_len = 0;
+
+			/* Object type */
+			unpack->obj.type = data[index] >> 4 & 0x7;
+			if (!unpack->obj.type) {
+				gitt_log_error("Invalid object type\n");
+				goto fail;
+			}
+			gitt_log_debug("Object type: %s\n", gitt_obj_types[unpack->obj.type]);
+
+			unpack->obj.size = data[index] & 0xf;
+			unpack->obj_state = 4;
+			if (!(data[index] & 0x80)) {
+				unpack->obj_state += 7 * 2;
+				gitt_log_debug("Object size: %u\n", unpack->obj.size);
+			}
+
+			index++;
 		}
-		if (!unpack->number)
-			unpack->pack_state = 2;
-		break;
-	case 13:
 
-		/* 20byte SHA-1 */
-		if (unpack->verify) {
-			bool pass;
-			uint8_t sha1[20];
-			int ret;
+		/* High bit of size */
+		while (index < size && unpack->obj_state < 18) {
+			/* Object size */
+			unpack->obj.size |= (data[index] & 0x7f) << unpack->obj_state;
 
-			ret = gitt_sha1_digest(&unpack->sha1, sha1);
-			if (ret)
-				pass = false;
+			if (data[index] & 0x80)
+				unpack->obj_state += 7;
 			else
-				pass = (bool) !memcmp(unpack->buf, sha1, sizeof(sha1));
+				unpack->obj_state = 18;
 
-			unpack->verify(pass, &unpack->sha1);
+			/* End check */
+			if (unpack->obj_state == 18) {
+				if (data[index] & 0x80) {
+					gitt_log_error("Object too big\n");
+					goto fail;
+				}
+				gitt_log_debug("Object size: %u\n", unpack->obj.size);
+
+				if (unpack->obj.size > unpack->buf_len) {
+					gitt_log_error("Uncompress output buffer does not have enough space\n");
+					goto fail;
+				}
+			}
+
+			index++;
 		}
 
-		unpack->pack_state = 3;
+		/* We don't deal with OFS_DELTA, so we skip its special part directly */
+		if (index < size && unpack->obj_state == 18) {
+			if (unpack->obj.type == 6) {
+				while ((index < size) && (data[index] & 0x80))
+					index++;
+				if ((index < size) && !(data[index] & 0x80)) {
+					unpack->obj_state++;
+					index++;
+				}
+			} else {
+				unpack->obj_state++;
+			}
+		}
 
-		break;
-	case 14:
-		return -1;
+		/* Decompress the data compressed by zlib */
+		if (index < size && unpack->obj_state == 19) {
+			in_size = size - index;
+			out_size = unpack->obj.size - unpack->valid_len;
+			ret = gitt_zlib_decompress_update(&unpack->zlib, data + index, &in_size,
+							unpack->buf + unpack->valid_len, &out_size);
+			if (ret)
+				goto fail;
+			unpack->valid_len += out_size;
+
+			/* Check whether decompression has been completed */
+			if (in_size == 0 && unpack->obj.size == unpack->valid_len) {
+				gitt_log_debug("Decompress has been completed\n");
+				gitt_zlib_compress_end(&unpack->zlib);
+				unpack->obj.data = (char *)unpack->buf;
+				unpack->number--;
+				unpack->obj_state = GITT_UNPACK_STATE_INIT;
+
+				/* Callback */
+				if (unpack->obj_dump)
+					unpack->obj_dump(&unpack->obj);
+
+				/* Check whether unpack has been completed */
+				if (!unpack->number) {
+					gitt_log_debug("Unpack has been completed\n");
+					unpack->pack_state++;
+				}
+			}
+
+			index += in_size;
+		}
+	} while (index < size && unpack->pack_state == 12);
+
+	return index;
+
+fail:
+	gitt_zlib_compress_end(&unpack->zlib);
+	unpack->pack_state = GITT_UNPACK_STATE_STOP;
+	return -1;
+}
+
+static int gitt_unpack_verify_step(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
+{
+	int ret;
+	uint16_t index = 0;
+	uint8_t sha1[20];
+	bool pass;
+
+	/* Initialization */
+	if (unpack->pack_state == 13)
+		unpack->valid_len = 0;
+
+	/* 20byte SHA-1 */
+	while (index < size && unpack->pack_state < 33) {
+		unpack->buf[unpack->valid_len] = data[index];
+		unpack->valid_len++;
+		unpack->pack_state++;
+		index++;
 	}
-#endif
 
-out:
+	/* Get result */
+	if (unpack->pack_state == 33) {
+		ret = gitt_sha1_digest(&unpack->sha1, sha1);
+		if (ret) {
+			gitt_log_error("SHA-1 digest fail\n");
+			return -1;
+		}
+
+		/* Callback */
+		pass = (bool)!memcmp(unpack->buf, sha1, sizeof(sha1));
+		if (unpack->verify_dump)
+			unpack->verify_dump(pass, &unpack->sha1);
+
+		/* You're lucky, it's all done! :) */
+		unpack->pack_state = GITT_UNPACK_STATE_STOP;
+	}
+
+	return index;
+}
+
+/**
+ * @brief Update data and unpack
+ *
+ * @param unpack handle
+ * @param data data point
+ * @param size data size
+ * @return int 0: Good
+ * @return int -1: Error
+ */
+int gitt_unpack_update(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
+{
+	int ret;
+	int cost;
+
+	/* If an error occurs or has been completed, processing will not continue */
+	if (unpack->pack_state == GITT_UNPACK_STATE_STOP)
+		return -1;
+
+	/*
+	 * Using a state machine to parse byte by byte
+	 */
+
+	/* State: 0 ~ 11 */
+	if (size && unpack->pack_state < 12) {
+		cost = gitt_unpack_header_step(unpack, data, size);
+		if (cost < 0) {
+			return cost;
+		} else if (cost > 0) {
+			ret = gitt_sha1_update(&unpack->sha1, data, cost);
+			if (ret) {
+				gitt_log_error("SHA-1 update fail\n");
+				return ret;
+			}
+			data += cost;
+			size -= cost;
+		}
+	}
+
+	/* State: 12 */
+	if (size && unpack->pack_state == 12) {
+		cost = gitt_unpack_obj_step(unpack, data, size);
+		if (cost < 0) {
+			return cost;
+		} else if (cost > 0) {
+			ret = gitt_sha1_update(&unpack->sha1, data, cost);
+			if (ret) {
+				gitt_log_error("SHA-1 update fail\n");
+				return ret;
+			}
+			data += cost;
+			size -= cost;
+		}
+	}
+
+	/* State: 13 ~ 32 */
+	if (size && unpack->pack_state < 33) {
+		cost = gitt_unpack_verify_step(unpack, data, size);
+		if (cost < 0)
+			return cost;
+		data += cost;
+		size -= cost;
+	}
+
 	return 0;
+}
+
+/**
+ * @brief Calling during unpacking can end this operation
+ *
+ * @param unpack handle
+ */
+void gitt_unpack_end(struct gitt_unpack *unpack)
+{
+	if (unpack->pack_state == GITT_UNPACK_STATE_STOP)
+		return;
+
+	if (unpack->obj_state != GITT_UNPACK_STATE_INIT) {
+		unpack->obj_state = GITT_UNPACK_STATE_INIT;
+		gitt_zlib_compress_end(&unpack->zlib);
+	}
+
+	unpack->pack_state = GITT_UNPACK_STATE_STOP;
 }

@@ -29,6 +29,7 @@
 #include <stdbool.h>
 #include <gitt_sha1.h>
 #include <gitt_obj.h>
+#include <gitt_zlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,25 +37,29 @@ extern "C" {
 
 struct gitt_unpack;
 
-typedef void (*gitt_obj_dump)(struct gitt_obj *obj);
-typedef void (*gitt_unpack_work)(struct gitt_unpack *unpack);
+typedef void (*gitt_unpack_header)(uint32_t *version, uint32_t *number);
+typedef void (*gitt_unpack_obj)(struct gitt_obj *obj);
 typedef void (*gitt_unpack_verify)(bool pass, struct gitt_sha1 *sha1);
 
 struct gitt_unpack {
-	struct gitt_sha1 sha1;
 	uint8_t *buf;
 	uint16_t buf_len;
-	gitt_obj_dump obj_dump;
-	uint32_t version;
-	uint32_t number;
-	gitt_unpack_work work;
-	gitt_unpack_verify verify;
+	uint16_t valid_len;
+	gitt_unpack_header header_dump;
+	gitt_unpack_obj obj_dump;
+	gitt_unpack_verify verify_dump;
 	uint8_t pack_state;
 	uint8_t obj_state;
+	uint32_t version;
+	uint32_t number;
+	struct gitt_zlib zlib;
+	struct gitt_obj obj;
+	struct gitt_sha1 sha1;
 };
 
 int gitt_unpack_init(struct gitt_unpack *unpack);
 int gitt_unpack_update(struct gitt_unpack *unpack, uint8_t *data, uint16_t size);
+void gitt_unpack_end(struct gitt_unpack *unpack);
 
 #ifdef __cplusplus
 }

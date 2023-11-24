@@ -24,7 +24,9 @@ CROSS_COMPILE :=
 CC := $(CROSS_COMPILE)gcc
 
 CFLAGS := -I../include \
-	  -I../third_party/zlib
+	  -I../third_party/zlib \
+	  -O2 \
+	  -Wall
 
 LIBRARY := -lssh
 
@@ -37,25 +39,25 @@ all: $(OBJS)
 clean:
 	rm -rf *.o *.a *.out $(OBJS)
 
-# Test for zlib
-EXAMPLES_SRCS := main.c \
-		 gitt_log_impl.c \
-		 gitt_ssh_impl.c \
-		 ../src/gitt_ssh.c \
-		 ../third_party/zlib/adler32.c \
-		 ../third_party/zlib/crc32.c \
-		 ../third_party/zlib/deflate.c \
-		 ../third_party/zlib/infback.c \
-		 ../third_party/zlib/inffast.c \
-		 ../third_party/zlib/inflate.c \
-		 ../third_party/zlib/inftrees.c \
-		 ../third_party/zlib/trees.c \
-		 ../third_party/zlib/zutil.c \
-		 ../third_party/zlib/compress.c \
-		 ../third_party/zlib/uncompr.c \
-		 ../src/gitt_sha1.c \
-		 ../src/gitt_unpack.c \
-		 ../src/gitt_obj.c
+EXAMPLES_SRCS := main.c
+EXAMPLES_SRCS += gitt_log_impl.c
+EXAMPLES_SRCS += gitt_ssh_impl.c
+EXAMPLES_SRCS += ../src/gitt_ssh.c
+EXAMPLES_SRCS += ../src/gitt_sha1.c
+EXAMPLES_SRCS += ../src/gitt_unpack.c
+EXAMPLES_SRCS += ../src/gitt_obj.c
+EXAMPLES_SRCS += ../src/gitt_zlib.c
+EXAMPLES_SRCS += ../third_party/zlib/adler32.c
+EXAMPLES_SRCS += ../third_party/zlib/crc32.c
+EXAMPLES_SRCS += ../third_party/zlib/deflate.c
+# EXAMPLES_SRCS += ../third_party/zlib/infback.c
+EXAMPLES_SRCS += ../third_party/zlib/inffast.c
+EXAMPLES_SRCS += ../third_party/zlib/inflate.c
+EXAMPLES_SRCS += ../third_party/zlib/inftrees.c
+EXAMPLES_SRCS += ../third_party/zlib/trees.c
+EXAMPLES_SRCS += ../third_party/zlib/zutil.c
+# EXAMPLES_SRCS += ../third_party/zlib/compress.c
+# EXAMPLES_SRCS += ../third_party/zlib/uncompr.c
 
 examples: $(EXAMPLES_SRCS)
 	$(CC) $(CFLAGS) $^ $(LIBRARY) -o $@
