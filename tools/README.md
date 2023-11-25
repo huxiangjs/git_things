@@ -6,7 +6,6 @@ For testing and evaluating Git Things.
 ### SHA-1
 * Build and test:
   ```shell
-  $ make
   $ make test_sha1
   gcc -I../include -I../third_party/zlib ../src/gitt_sha1.c test_sha1.c -o test_sha1
   $ ./test_sha1
@@ -23,7 +22,7 @@ For testing and evaluating Git Things.
 ### ZLIB
 * Build and test:
   ```shell
-  $ make
+  $ make test_zlib
   gcc -I../include -I../third_party/zlib -DGITT_LOG_TO_STDIO test_zlib.c ../src/  gitt_zlib.c ../third_party/zlib/adler32.c ../third_party/zlib/crc32.c ../  third_party/zlib/deflate.c ../third_party/zlib/inffast.c ../third_party/zlib/  inflate.c ../third_party/zlib/inftrees.c ../third_party/zlib/trees.c ../  third_party/zlib/zutil.c -o test_zlib
   $ ./test_zlib 
   00 01 ... fe ff
@@ -32,4 +31,17 @@ For testing and evaluating Git Things.
   Decompressed 432 bytes into 1024 bytes
   Decompressed 432 bytes into 1024 bytes
   00 01 ... fe ff
+  ```
+
+### Unpack
+* Build and test:
+  ```shell
+  $ make test_unpack
+  gcc -I../include -I../third_party/zlib -DGITT_LOG_TO_STDIO -O2 -Wall  test_unpack.c ../src/gitt_sha1.c ../src/gitt_unpack.c ../src/gitt_obj.c ../src/gitt_zlib.c ../  third_party/zlib/adler32.c ../third_party/zlib/crc32.c ../third_party/zlib/deflate.c ../third_party/zlib/inffast.c ../third_party/zlib/inflate.c ../third_party/zlib/  inftrees.c ../third_party/zlib/trees.c ../third_party/zlib/zutil.c -o test_unpack
+  $ ./test_unpack
+  File size: 9779byte
+  [       1] version:2, number of objects:42; ****************************************** verify pass, SHA-1: a52896a8b8e6e3f91c5a941653eb7add97b8ae82
+  ......
+  [    9779] version:2, number of objects:42; ****************************************** verify pass, SHA-1: a52896a8b8e6e3f91c5a941653eb7add97b8ae82
+  Test end
   ```

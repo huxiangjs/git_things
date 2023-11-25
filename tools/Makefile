@@ -31,17 +31,19 @@ CFLAGS := -I../include \
 
 .PHONY: all clean
 
-OBJS := test_sha1 test_zlib
+OBJS := test_sha1 test_zlib test_unpack
 
 all: $(OBJS)
 
 clean:
 	rm -rf *.o *.a *.out $(OBJS)
 
+
 # Test for SHA1
 SHA1_SRCS := ../src/gitt_sha1.c test_sha1.c
 test_sha1: $(SHA1_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@
+
 
 # Test for zlib
 ZLIB_SRCS := test_zlib.c
@@ -59,4 +61,26 @@ ZLIB_SRCS += ../third_party/zlib/zutil.c
 # ZLIB_SRCS += ../third_party/zlib/uncompr.c
 
 test_zlib: $(ZLIB_SRCS)
+	$(CC) $(CFLAGS) $^ -o $@
+
+
+# Test for unpack
+UNPACK_SRCS := test_unpack.c
+UNPACK_SRCS += ../src/gitt_sha1.c
+UNPACK_SRCS += ../src/gitt_unpack.c
+UNPACK_SRCS += ../src/gitt_obj.c
+UNPACK_SRCS += ../src/gitt_zlib.c
+UNPACK_SRCS += ../third_party/zlib/adler32.c
+UNPACK_SRCS += ../third_party/zlib/crc32.c
+UNPACK_SRCS += ../third_party/zlib/deflate.c
+# UNPACK_SRCS += ../third_party/zlib/infback.c
+UNPACK_SRCS += ../third_party/zlib/inffast.c
+UNPACK_SRCS += ../third_party/zlib/inflate.c
+UNPACK_SRCS += ../third_party/zlib/inftrees.c
+UNPACK_SRCS += ../third_party/zlib/trees.c
+UNPACK_SRCS += ../third_party/zlib/zutil.c
+# UNPACK_SRCS += ../third_party/zlib/compress.c
+# UNPACK_SRCS += ../third_party/zlib/uncompr.c
+
+test_unpack: $(UNPACK_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@
