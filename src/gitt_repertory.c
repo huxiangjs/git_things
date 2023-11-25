@@ -33,19 +33,12 @@ static int gitt_command_pack_dump_callback(void *param, char *data, int size)
 	return gitt_unpack_update(unpack, (uint8_t *)data, (uint16_t)size);
 }
 
-static void gitt_unpack_obj_callback(struct gitt_obj *obj)
-{
-	gitt_log_debug("type:%s, size:%d\n", gitt_obj_types[obj->type], obj->size);
-	if (obj->type == 1 || obj->type == 2)
-		gitt_log_debug("%.*s\n", obj->size, obj->data);
-}
-
-static void gitt_unpack_header_callback(uint32_t *version, uint32_t *number)
+static void gitt_unpack_header_dump_callback(uint32_t *version, uint32_t *number)
 {
 	gitt_log_debug("version:%u, number of objects:%u; ", *version, *number);
 }
 
-static void gitt_unpack_verify_callback(bool pass, struct gitt_sha1 *sha1)
+static void gitt_unpack_verify_dump_callback(bool pass, struct gitt_sha1 *sha1)
 {
 	char sha1_hex[41];
 	int ret;
@@ -96,9 +89,9 @@ int gitt_repertory_clone(struct gitt_repertory *repertory)
 	/* Initialize Unpack and prepare to unpack */
 	unpack.buf = repertory->buf;
 	unpack.buf_len = repertory->buf_len;
-	unpack.header_dump = gitt_unpack_header_callback;
-	unpack.obj_dump = gitt_unpack_obj_callback;
-	unpack.verify_dump = gitt_unpack_verify_callback;
+	unpack.header_dump = gitt_unpack_header_dump_callback;
+	unpack.obj_dump = repertory->obj_dump;
+	unpack.verify_dump = gitt_unpack_verify_dump_callback;
 	ret = gitt_unpack_init(&unpack);
 	if (ret)
 		goto err0;

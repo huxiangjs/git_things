@@ -37,6 +37,7 @@ struct gitt_repertory {
 	char sha1[41];
 	uint8_t *buf;
 	uint16_t buf_len;
+	gitt_unpack_obj obj_dump;
 };
 
 int gitt_repertory_init(struct gitt_repertory *repertory);
