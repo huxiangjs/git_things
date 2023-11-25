@@ -154,7 +154,8 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 				}
 				gitt_log_debug("Object size: %u\n", unpack->obj.size);
 
-				if (unpack->obj.size > unpack->buf_len) {
+				/* For commit, we need to give it a terminator */
+				if (unpack->obj.size + 1 > unpack->buf_len) {
 					gitt_log_error("Uncompress output buffer does not have enough space\n");
 					goto fail;
 				}
@@ -192,6 +193,8 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 				gitt_log_debug("Decompress has been completed\n");
 				gitt_zlib_compress_end(&unpack->zlib);
 				unpack->obj.data = (char *)unpack->buf;
+				/* Anyway, we add the terminator to it */
+				unpack->obj.data[unpack->obj.size] = '\0';
 				unpack->number--;
 				unpack->obj_state = GITT_UNPACK_STATE_INIT;
 

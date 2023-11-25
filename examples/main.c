@@ -23,18 +23,47 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <gitt_repertory.h>
+#include <gitt_commit.h>
 
 #define PRIVKEY_PATH	"/home/huxiang/.ssh/id_ed25519"
 #define REPERTORY_URL	"git@github.com:huxiangjs/git_things.git"
 
+static void __replace(char src, char tag, char *buf, int buf_size)
+{
+	int i;
+
+	for (i = 0; i < buf_size; i++)
+		buf[i] = buf[i] == src ? tag : buf[i];
+}
+
 static void gitt_obj_dump_callback(struct gitt_obj *obj)
 {
+	int ret;
+	struct gitt_commit commit;
 	// printf("type:%s, size:%d\n", gitt_obj_types[obj->type], obj->size);
 
 	/* Print commit */
-	if (obj->type == 1)
-		printf("%.*s\n", obj->size, obj->data);
+	if (obj->type == 1) {
+		ret = gitt_commit_parse(obj->data, obj->size, &commit);
+		if (!ret) {
+			printf("commit.tree.sha1      : %s\n", commit.tree.sha1      );
+			printf("commit.parent.sha1    : %s\n", commit.parent.sha1    );
+			printf("commit.author.date    : %s\n", commit.author.date    );
+			printf("commit.author.email   : %s\n", commit.author.email   );
+			printf("commit.author.name    : %s\n", commit.author.name    );
+			printf("commit.author.zone    : %s\n", commit.author.zone    );
+			printf("commit.committer.date : %s\n", commit.committer.date );
+			printf("commit.committer.email: %s\n", commit.committer.email);
+			printf("commit.committer.name : %s\n", commit.committer.name );
+			printf("commit.committer.zone : %s\n", commit.committer.zone );
+			printf("commit.message        : ");
+			__replace('\n', ' ', commit.message, strlen(commit.message));
+			printf("%s\n", commit.message);
+			printf("\n");
+		}
+	}
 }
 
 int main(int args, char *argv[])
