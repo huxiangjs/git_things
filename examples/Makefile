@@ -32,32 +32,32 @@ LIBRARY := -lssh
 
 .PHONY: all clean
 
-OBJS := examples
+OBJS := gitt
 
 all: $(OBJS)
 
 clean:
 	rm -rf *.o *.a *.out $(OBJS)
 
-EXAMPLES_SRCS := main.c
-EXAMPLES_SRCS += gitt_log_impl.c
-EXAMPLES_SRCS += gitt_ssh_impl.c
-EXAMPLES_SRCS += ../src/gitt_ssh.c
-EXAMPLES_SRCS += ../src/gitt_sha1.c
-EXAMPLES_SRCS += ../src/gitt_unpack.c
-EXAMPLES_SRCS += ../src/gitt_obj.c
-EXAMPLES_SRCS += ../src/gitt_zlib.c
-EXAMPLES_SRCS += ../third_party/zlib/adler32.c
-EXAMPLES_SRCS += ../third_party/zlib/crc32.c
-EXAMPLES_SRCS += ../third_party/zlib/deflate.c
-# EXAMPLES_SRCS += ../third_party/zlib/infback.c
-EXAMPLES_SRCS += ../third_party/zlib/inffast.c
-EXAMPLES_SRCS += ../third_party/zlib/inflate.c
-EXAMPLES_SRCS += ../third_party/zlib/inftrees.c
-EXAMPLES_SRCS += ../third_party/zlib/trees.c
-EXAMPLES_SRCS += ../third_party/zlib/zutil.c
-# EXAMPLES_SRCS += ../third_party/zlib/compress.c
-# EXAMPLES_SRCS += ../third_party/zlib/uncompr.c
+GITT_SRCS := main.c
+GITT_SRCS += gitt_log_impl.c
+GITT_SRCS += gitt_ssh_impl.c
+GITT_SRCS += ../src/gitt_ssh.c
+GITT_SRCS += ../src/gitt_sha1.c
+GITT_SRCS += ../src/gitt_unpack.c
+GITT_SRCS += ../src/gitt_obj.c
+GITT_SRCS += ../src/gitt_zlib.c
+GITT_SRCS += ../third_party/zlib/adler32.c
+GITT_SRCS += ../third_party/zlib/crc32.c
+GITT_SRCS += ../third_party/zlib/deflate.c
+# GITT_SRCS += ../third_party/zlib/infback.c
+GITT_SRCS += ../third_party/zlib/inffast.c
+GITT_SRCS += ../third_party/zlib/inflate.c
+GITT_SRCS += ../third_party/zlib/inftrees.c
+GITT_SRCS += ../third_party/zlib/trees.c
+GITT_SRCS += ../third_party/zlib/zutil.c
+# GITT_SRCS += ../third_party/zlib/compress.c
+# GITT_SRCS += ../third_party/zlib/uncompr.c
 
-examples: $(EXAMPLES_SRCS)
+gitt: $(GITT_SRCS)
 	$(CC) $(CFLAGS) $^ $(LIBRARY) -o $@

@@ -22,5 +22,5 @@
 ## How to use?
   ```shell
   make
-  ./examples
+  ./gitt
   ```
