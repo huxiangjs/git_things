@@ -164,22 +164,30 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 			index++;
 		}
 
-		/* We don't deal with OFS_DELTA, so we skip its special part directly */
-		if (index < size && unpack->obj_state == 18) {
+		/* We don't deal with OFS_DELTA or REF_DELTA, so we skip its special part directly */
+		if (index < size && unpack->obj_state < 38) {
 			if (unpack->obj.type == 6) {
+				/* Skip length */
 				while ((index < size) && (data[index] & 0x80))
 					index++;
 				if ((index < size) && !(data[index] & 0x80)) {
+					unpack->obj_state = 38;
+					index++;
+				}
+			} else if (unpack->obj.type == 7) {
+				/* Skip 20byte SHA-1 */
+				while (index < size && unpack->obj_state < 38) {
 					unpack->obj_state++;
 					index++;
 				}
 			} else {
-				unpack->obj_state++;
+				/* Do nothing, jump to the next step */
+				unpack->obj_state = 38;
 			}
 		}
 
 		/* Decompress the data compressed by zlib */
-		if (index < size && unpack->obj_state == 19) {
+		if (index < size && unpack->obj_state == 38) {
 			in_size = size - index;
 			out_size = unpack->obj.size - unpack->valid_len;
 			ret = gitt_zlib_decompress_update(&unpack->zlib, data + index, &in_size,

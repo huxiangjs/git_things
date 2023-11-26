@@ -227,7 +227,7 @@ int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[4
 	if (have_sha1) {
 		length = strlen(line3);
 		gitt_command_set_line_length(line3, length);
-		gitt_command_set_line_sha1(9, line3, want_sha1);
+		gitt_command_set_line_sha1(9, line3, have_sha1);
 		gitt_log_debug(line3);
 		ret = gitt_ssh_write(ssh, line3, length);
 		if (ret != length) {
@@ -290,8 +290,14 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 				} else if (ret >= 3 && buf[0] == 'N' && buf[1] == 'A' && buf[2] == 'K') {
 					gitt_log_debug("NAK\n");
 					type = 0x03;
+				} else if (ret >= 3 && buf[0] == 'A' && buf[1] == 'C' && buf[2] == 'K') {
+					gitt_log_debug("ACK\n");
+					type = 0x04;
 				} else {
-					gitt_log_error("Unknown format: '0x%02x'\n", buf[0]);
+					if (buf[0] >= '0' && buf[0] <= 'z')
+						gitt_log_error("Unknown case: %.*s\n", valid, pbuf);
+					else
+						gitt_log_error("Unknown format: '0x%02x'\n", buf[0]);
 					type = 0xff;
 				}
 			}

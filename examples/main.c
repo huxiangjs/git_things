@@ -88,12 +88,29 @@ int main(int args, char *argv[])
 		return -1;
 	}
 
-	// ret = gitt_repertory_update_head(&repertory);
+#if 0
+	ret = gitt_repertory_update_head(&repertory);
+	if (ret) {
+		printf("An error occurred while update head\n");
+		return -1;
+	}
+#else
+	strcpy(repertory.head_sha1, "e5ceb02e938f16285e684ac2976dc35c6adcb674");
+#endif
+
+	ret = gitt_repertory_pull(&repertory);
+	if (ret) {
+		printf("An error occurred while pull the repertory\n");
+		return -1;
+	}
+
+#if 0
 	ret = gitt_repertory_clone(&repertory);
 	if (ret) {
 		printf("An error occurred while clone the repertory\n");
 		return -1;
 	}
+#endif
 
 	printf("Test end\n");
 
