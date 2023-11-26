@@ -166,7 +166,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 
 		/* We don't deal with OFS_DELTA or REF_DELTA, so we skip its special part directly */
 		if (index < size && unpack->obj_state < 38) {
-			if (unpack->obj.type == 6) {
+			if (unpack->obj.type == GITT_OBJ_TYPE_OFS_DELTA) {
 				/* Skip length */
 				while ((index < size) && (data[index] & 0x80))
 					index++;
@@ -174,7 +174,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 					unpack->obj_state = 38;
 					index++;
 				}
-			} else if (unpack->obj.type == 7) {
+			} else if (unpack->obj.type == GITT_OBJ_TYPE_REF_DELTA) {
 				/* Skip 20byte SHA-1 */
 				while (index < size && unpack->obj_state < 38) {
 					unpack->obj_state++;

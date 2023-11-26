@@ -39,6 +39,13 @@ struct gitt_obj {
 
 extern const char *gitt_obj_types[];
 
+#define GITT_OBJ_TYPE_COMMIT		1
+#define GITT_OBJ_TYPE_TREE		2
+#define GITT_OBJ_TYPE_BLOB		3
+#define GITT_OBJ_TYPE_TAG		4
+#define GITT_OBJ_TYPE_OFS_DELTA		6
+#define GITT_OBJ_TYPE_REF_DELTA		7
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
