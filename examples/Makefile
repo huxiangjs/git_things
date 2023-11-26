@@ -26,7 +26,8 @@ CC := $(CROSS_COMPILE)gcc
 CFLAGS := -I../include \
 	  -I../third_party/zlib \
 	  -O2 \
-	  -Wall
+	  -Wall \
+	  -Wno-pointer-to-int-cast
 
 LIBRARY := -lssh
 

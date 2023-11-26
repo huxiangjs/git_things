@@ -22,9 +22,26 @@
  * SOFTWARE.
  */
 
+#include <gitt_type.h>
 #include <gitt_log.h>
 #include <gitt_command.h>
 #include <gitt_repertory.h>
+
+static void gitt_obj_dump_callback(struct gitt_obj *obj)
+{
+	int ret;
+	struct gitt_commit commit;
+	struct gitt_unpack *unpack = gitt_containerof(obj, struct gitt_unpack, obj);
+	struct gitt_repertory *repertory = gitt_containerof(unpack, struct gitt_repertory, unpack);
+
+	gitt_log_debug("type:%s, size:%d\n", gitt_obj_types[obj->type], obj->size);
+
+	if (obj->type == 1 && repertory->commit_dump) {
+		ret = gitt_commit_parse(obj->data, obj->size, &commit);
+		if (!ret)
+			repertory->commit_dump(&commit);
+	}
+}
 
 static int gitt_command_pack_dump_callback(void *param, char *data, int size)
 {
@@ -50,6 +67,13 @@ static void gitt_unpack_verify_dump_callback(bool pass, struct gitt_sha1 *sha1)
 		gitt_log_debug("SHA-1: %s\n", sha1_hex);
 }
 
+/**
+ * @brief Initialization repertory
+ *
+ * @param repertory
+ * @return int 0: Good
+ * @return int -1: Error
+ */
 int gitt_repertory_init(struct gitt_repertory *repertory)
 {
 	if (!repertory->privkey || !repertory->url) {
@@ -65,11 +89,17 @@ int gitt_repertory_init(struct gitt_repertory *repertory)
 	return 0;
 }
 
+/**
+ * @brief Read repertory
+ *
+ * @param repertory
+ * @return int 0: Good
+ * @return int -1: Error
+ */
 int gitt_repertory_clone(struct gitt_repertory *repertory)
 {
 	struct gitt_ssh* ssh;
 	int ret;
-	struct gitt_unpack unpack = {0};
 
 	gitt_log_debug("Step: start\n");
 	ssh = gitt_command_start_upload(repertory->url, repertory->privkey);
@@ -87,28 +117,28 @@ int gitt_repertory_clone(struct gitt_repertory *repertory)
 		goto err0;
 
 	/* Initialize Unpack and prepare to unpack */
-	unpack.buf = repertory->buf;
-	unpack.buf_len = repertory->buf_len;
-	unpack.header_dump = gitt_unpack_header_dump_callback;
-	unpack.obj_dump = repertory->obj_dump;
-	unpack.verify_dump = gitt_unpack_verify_dump_callback;
-	ret = gitt_unpack_init(&unpack);
+	repertory->unpack.buf = repertory->buf;
+	repertory->unpack.buf_len = repertory->buf_len;
+	repertory->unpack.header_dump = gitt_unpack_header_dump_callback;
+	repertory->unpack.obj_dump = gitt_obj_dump_callback;
+	repertory->unpack.verify_dump = gitt_unpack_verify_dump_callback;
+	ret = gitt_unpack_init(&repertory->unpack);
 	if (ret)
 		goto err0;
 
 	gitt_log_debug("Step: get pack\n");
-	ret = gitt_command_get_pack(ssh, gitt_command_pack_dump_callback, &unpack);
+	ret = gitt_command_get_pack(ssh, gitt_command_pack_dump_callback, &repertory->unpack);
 	if (ret)
 		goto err1;
 
-	gitt_unpack_end(&unpack);
+	gitt_unpack_end(&repertory->unpack);
 	gitt_command_end(ssh);
 	gitt_log_debug("SHA-1 updated: %s\n", repertory->sha1);
 
 	return 0;
 
 err1:
-	gitt_unpack_end(&unpack);
+	gitt_unpack_end(&repertory->unpack);
 err0:
 	gitt_command_end(ssh);
 	return -1;

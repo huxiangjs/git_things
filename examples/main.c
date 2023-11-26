@@ -38,32 +38,22 @@ static void __replace(char src, char tag, char *buf, int buf_size)
 		buf[i] = buf[i] == src ? tag : buf[i];
 }
 
-static void gitt_obj_dump_callback(struct gitt_obj *obj)
+static void gitt_repertory_commit_dump(struct gitt_commit *commit)
 {
-	int ret;
-	struct gitt_commit commit;
-	// printf("type:%s, size:%d\n", gitt_obj_types[obj->type], obj->size);
-
-	/* Print commit */
-	if (obj->type == 1) {
-		ret = gitt_commit_parse(obj->data, obj->size, &commit);
-		if (!ret) {
-			printf("commit.tree.sha1      : %s\n", commit.tree.sha1      );
-			printf("commit.parent.sha1    : %s\n", commit.parent.sha1    );
-			printf("commit.author.date    : %s\n", commit.author.date    );
-			printf("commit.author.email   : %s\n", commit.author.email   );
-			printf("commit.author.name    : %s\n", commit.author.name    );
-			printf("commit.author.zone    : %s\n", commit.author.zone    );
-			printf("commit.committer.date : %s\n", commit.committer.date );
-			printf("commit.committer.email: %s\n", commit.committer.email);
-			printf("commit.committer.name : %s\n", commit.committer.name );
-			printf("commit.committer.zone : %s\n", commit.committer.zone );
-			printf("commit.message        : ");
-			__replace('\n', ' ', commit.message, strlen(commit.message));
-			printf("%s\n", commit.message);
-			printf("\n");
-		}
-	}
+	printf("tree.sha1      : %s\n", commit->tree.sha1      );
+	printf("parent.sha1    : %s\n", commit->parent.sha1    );
+	printf("author.date    : %s\n", commit->author.date    );
+	printf("author.email   : %s\n", commit->author.email   );
+	printf("author.name    : %s\n", commit->author.name    );
+	printf("author.zone    : %s\n", commit->author.zone    );
+	printf("committer.date : %s\n", commit->committer.date );
+	printf("committer.email: %s\n", commit->committer.email);
+	printf("committer.name : %s\n", commit->committer.name );
+	printf("committer.zone : %s\n", commit->committer.zone );
+	printf("message        : ");
+	__replace('\n', ' ', commit->message, strlen(commit->message));
+	printf("%s\n", commit->message);
+	printf("\n");
 }
 
 int main(int args, char *argv[])
@@ -91,7 +81,7 @@ int main(int args, char *argv[])
 	repertory.url = REPERTORY_URL;
 	repertory.buf = buf;
 	repertory.buf_len = sizeof(buf);
-	repertory.obj_dump = gitt_obj_dump_callback;
+	repertory.commit_dump = gitt_repertory_commit_dump;
 	ret = gitt_repertory_init(&repertory);
 	if (ret) {
 		printf("An error occurred while initializing the repertory\n");

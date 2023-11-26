@@ -22,37 +22,23 @@
  * SOFTWARE.
  */
 
-#ifndef __GITT_REPERTORY_H_
-#define __GITT_REPERTORY_H_
+#ifndef __GITT_TYPE_H_
+#define __GITT_TYPE_H_
 
-#include <gitt_unpack.h>
-#include <gitt_commit.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-typedef void (*gitt_repertory_commit)(struct gitt_commit *commit);
+#define gitt_offsetof(type, member) \
+	((int) &((type *)0)->member)
 
-struct gitt_repertory {
-	struct gitt_unpack unpack;
-	char *url;
-	char *privkey;
-	char sha1[41];
-	uint8_t *buf;
-	uint16_t buf_len;
-	gitt_repertory_commit commit_dump;
-};
-
-int gitt_repertory_init(struct gitt_repertory *repertory);
-int gitt_repertory_clone(struct gitt_repertory *repertory);
-int gitt_repertory_push(struct gitt_repertory *repertory);
-int gitt_repertory_pull(struct gitt_repertory *repertory);
-int gitt_repertory_update_head(struct gitt_repertory *repertory);
-int gitt_repertory_end(struct gitt_repertory *repertory);
+#define gitt_containerof(ptr, type, member) \
+	(type *)((char *)(ptr) - gitt_offsetof(type, member))
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
-#endif /* __GITT_REPERTORY_H_ */
+#endif /* __GITT_TYPE_H_ */
