@@ -40,6 +40,7 @@ static void __replace(char src, char tag, char *buf, int buf_size)
 
 static void gitt_repertory_commit_dump(struct gitt_commit *commit)
 {
+	printf("id.sha1        : %s\n", commit->id.sha1        );
 	printf("tree.sha1      : %s\n", commit->tree.sha1      );
 	printf("parent.sha1    : %s\n", commit->parent.sha1    );
 	printf("author.date    : %s\n", commit->author.date    );

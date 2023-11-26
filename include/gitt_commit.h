@@ -31,6 +31,10 @@
 extern "C" {
 #endif /* __cplusplus */
 
+struct gitt_commit_id {
+	char sha1[41];
+};
+
 struct gitt_commit_tree {
 	char *sha1;
 };
@@ -54,6 +58,7 @@ struct gitt_commit_committer {
 };
 
 struct gitt_commit {
+	struct gitt_commit_id id;
 	struct gitt_commit_tree tree;
 	struct gitt_commit_parent parent;
 	struct gitt_commit_author author;

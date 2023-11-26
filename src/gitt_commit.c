@@ -22,8 +22,10 @@
  * SOFTWARE.
  */
 
+#include <stdio.h>
 #include <gitt_commit.h>
 #include <gitt_log.h>
+#include <gitt_sha1.h>
 #include <string.h>
 
 static char *gitt_commit_find_line_end(char *buf, uint16_t size, char dir)
@@ -63,6 +65,34 @@ static char *gitt_commit_find_line_char(char *buf, uint16_t size, char ch)
 	return NULL;
 }
 
+static int gitt_commit_sha1(char *buf, uint16_t size, struct gitt_commit_id *id)
+{
+	struct gitt_sha1 sha1;
+	int ret;
+	char front_str[16];
+
+	gitt_sha1_init(&sha1);
+
+	ret = sprintf(front_str, "commit %u", size);
+	if (ret <= 0)
+		return -1;
+
+	ret = gitt_sha1_update(&sha1, (uint8_t *)front_str, ret + 1);
+	if (ret)
+		return ret;
+
+	ret = gitt_sha1_update(&sha1, (uint8_t *)buf, size);
+	if (ret)
+		return ret;
+
+	ret = gitt_sha1_hexdigest(&sha1, id->sha1);
+	if (ret)
+		return ret;
+
+	gitt_log_debug("SHA1: %s\n", id->sha1);
+	return 0;
+}
+
 int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 {
 	char *empty_str = "";
@@ -70,6 +100,9 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 	char *cur;
 	char *next;
 	int valid_size;
+
+	if (gitt_commit_sha1(buf, size, &commit->id))
+		return -1;
 
 	/* Padded with empty string */
 	commit->tree.sha1 = empty_str;
