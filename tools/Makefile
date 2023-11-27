@@ -68,7 +68,7 @@ test_zlib: $(ZLIB_SRCS)
 UNPACK_SRCS := test_unpack.c
 UNPACK_SRCS += ../src/gitt_sha1.c
 UNPACK_SRCS += ../src/gitt_unpack.c
-UNPACK_SRCS += ../src/gitt_obj.c
+UNPACK_SRCS += ../src/gitt_misc.c
 UNPACK_SRCS += ../src/gitt_zlib.c
 UNPACK_SRCS += ../third_party/zlib/adler32.c
 UNPACK_SRCS += ../third_party/zlib/crc32.c

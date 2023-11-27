@@ -27,6 +27,7 @@
 #include <gitt_log.h>
 #include <gitt_command.h>
 #include <gitt_repertory.h>
+#include <gitt_errno.h>
 
 static void gitt_obj_dump_callback(struct gitt_obj *obj)
 {
@@ -35,7 +36,7 @@ static void gitt_obj_dump_callback(struct gitt_obj *obj)
 	struct gitt_unpack *unpack = gitt_containerof(obj, struct gitt_unpack, obj);
 	struct gitt_repertory *repertory = gitt_containerof(unpack, struct gitt_repertory, unpack);
 
-	gitt_log_debug("type:%s, size:%d\n", gitt_obj_types[obj->type], obj->size);
+	gitt_log_debug("type:%s, size:%d\n", GITT_OBJ_STR(obj->type), obj->size);
 
 	if (obj->type == 1 && repertory->commit_dump) {
 		ret = gitt_commit_parse(obj->data, obj->size, &commit);

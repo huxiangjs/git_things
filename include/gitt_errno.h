@@ -22,7 +22,24 @@
  * SOFTWARE.
  */
 
-const char *gitt_obj_types[] = {
-	"none", "commit", "tree", "blob",
-	"tag", "none", "ofs_delta", "ref_delta"
-};
+#ifndef __GITT_ERRNO_H_
+#define __GITT_ERRNO_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+extern const char *gitt_errno_types[];
+
+#define GITT_ERRNO_OK			0
+#define GITT_ERRNO_INVAL		1
+#define GITT_ERRNO_NOMEM		2
+#define GITT_ERRNO_RETRY		3
+
+#define GITT_ERRNO_STR(no)	gitt_errno_types[no]
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+#endif /* __GITT_ERRNO_H_ */

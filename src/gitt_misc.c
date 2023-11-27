@@ -22,34 +22,20 @@
  * SOFTWARE.
  */
 
-#ifndef __GITT_OBJ_H_
-#define __GITT_OBJ_H_
-
-#include <stdint.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
-struct gitt_obj {
-	uint8_t type;
-	uint16_t size;
-	char *data;
+const char *gitt_obj_types[] = {
+	"none",
+	"commit",
+	"tree",
+	"blob",
+	"tag",
+	"none",
+	"ofs_delta",
+	"ref_delta"
 };
 
-extern const char *gitt_obj_types[];
-
-#define GITT_OBJ_TYPE_COMMIT		1
-#define GITT_OBJ_TYPE_TREE		2
-#define GITT_OBJ_TYPE_BLOB		3
-#define GITT_OBJ_TYPE_TAG		4
-#define GITT_OBJ_TYPE_OFS_DELTA		6
-#define GITT_OBJ_TYPE_REF_DELTA		7
-
-#define GITT_OBJ_STR(no)	gitt_obj_types[no]
-
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
-
-#endif /* __GITT_OBJ_H_ */
+const char *gitt_errno_types[] = {
+	"No errors",
+	"Invalid parameter",
+	"Not enough memory",
+	"Please try again"
+};

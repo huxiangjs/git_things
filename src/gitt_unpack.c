@@ -26,6 +26,7 @@
 #include <zlib.h>
 #include <gitt_unpack.h>
 #include <gitt_log.h>
+#include <gitt_errno.h>
 
 #define GITT_UNPACK_STATE_INIT		0x00
 #define GITT_UNPACK_STATE_STOP		0xff
@@ -124,7 +125,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 				gitt_log_error("Invalid object type\n");
 				goto fail;
 			}
-			gitt_log_debug("Object type: %s\n", gitt_obj_types[unpack->obj.type]);
+			gitt_log_debug("Object type: %s\n", GITT_OBJ_STR(unpack->obj.type));
 
 			unpack->obj.size = data[index] & 0xf;
 			unpack->obj_state = 4;
