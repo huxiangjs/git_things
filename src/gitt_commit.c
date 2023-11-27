@@ -27,6 +27,7 @@
 #include <gitt_log.h>
 #include <gitt_sha1.h>
 #include <string.h>
+#include <gitt_errno.h>
 
 static char *gitt_commit_find_line_end(char *buf, uint16_t size, char dir)
 {
@@ -75,7 +76,7 @@ static int gitt_commit_sha1(char *buf, uint16_t size, struct gitt_commit_id *id)
 
 	ret = sprintf(front_str, "commit %u", size);
 	if (ret <= 0)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	ret = gitt_sha1_update(&sha1, (uint8_t *)front_str, ret + 1);
 	if (ret)
@@ -102,7 +103,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 	int valid_size;
 
 	if (gitt_commit_sha1(buf, size, &commit->id))
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	/* Padded with empty string */
 	commit->tree.sha1 = empty_str;
@@ -132,7 +133,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			valid_size -= 5;
 			next = gitt_commit_find_line_end(start, valid_size, 'D');
 			if (!next)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 			*next = '\0';
 			gitt_log_debug("SHA-1: %s\n", start);
 
@@ -144,7 +145,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			valid_size -= 7;
 			next = gitt_commit_find_line_end(start, valid_size, 'D');
 			if (!next)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 			*next = '\0';
 
 			commit->parent.sha1 = start;
@@ -157,7 +158,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			/* Name */
 			next = gitt_commit_find_line_char(start, valid_size, '<');
 			if (!next)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 			*(next - 1) = '\0';
 			commit->author.name = start;
 			valid_size -= next - start + 1;
@@ -166,7 +167,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			/* E-Mail */
 			next = gitt_commit_find_line_char(start, valid_size, '>');
 			if (!next)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 			*next = '\0';
 			commit->author.email = start;
 			valid_size -= next - start + 2;
@@ -175,7 +176,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			/* Date */
 			next = gitt_commit_find_line_char(start, valid_size, ' ');
 			if (!next)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 			*(next - 1) = '\0';
 			commit->author.date = start;
 			valid_size -= next - start + 1;
@@ -184,7 +185,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			/* Zone */
 			next = gitt_commit_find_line_end(start, valid_size, 'D');
 			if (!next)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 			*(next - 1) = '\0';
 			commit->author.zone = start;
 			valid_size -= next - start + 1;
@@ -196,7 +197,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			/* Name */
 			next = gitt_commit_find_line_char(start, valid_size, '<');
 			if (!next)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 			*(next - 1) = '\0';
 			commit->committer.name = start;
 			valid_size -= next - start + 1;
@@ -205,7 +206,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			/* E-Mail */
 			next = gitt_commit_find_line_char(start, valid_size, '>');
 			if (!next)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 			*next = '\0';
 			commit->committer.email = start;
 			valid_size -= next - start + 2;
@@ -214,7 +215,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			/* Date */
 			next = gitt_commit_find_line_char(start, valid_size, ' ');
 			if (!next)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 			*(next - 1) = '\0';
 			commit->committer.date = start;
 			valid_size -= next - start + 1;
@@ -223,7 +224,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			/* Zone */
 			next = gitt_commit_find_line_end(start, valid_size, 'D');
 			if (!next)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 			*(next - 1) = '\0';
 			commit->committer.zone = start;
 			valid_size -= next - start + 1;
@@ -243,7 +244,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 		commit->message = start;
 	} else {
 		gitt_log_debug("Message not found\n");
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	}
 
 	return 0;

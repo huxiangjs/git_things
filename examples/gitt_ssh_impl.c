@@ -26,6 +26,7 @@
 #include <malloc.h>
 #include <libssh/libssh.h>
 #include <gitt_ssh.h>
+#include <gitt_errno.h>
 
 struct gitt_ssh {
 	ssh_session session;
@@ -99,7 +100,7 @@ out2:
 out1:
 	ssh_free(ssh->session);
 out0:
-	return -1;
+	return -GITT_ERRNO_INVAL;
 }
 
 int gitt_ssh_read_impl(struct gitt_ssh *ssh, char *buf, int size)

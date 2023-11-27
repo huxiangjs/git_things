@@ -80,12 +80,12 @@ int gitt_repertory_init(struct gitt_repertory *repertory)
 {
 	if (!repertory->privkey || !repertory->url) {
 		gitt_log_error("Privkey and repertory cannot be empty\n");
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	}
 
 	if (!repertory->buf || repertory->buf_len < 20) {
 		gitt_log_error("Buffe cannot be empty and the length cannot be less than 20\n");
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	}
 
 	return 0;
@@ -126,7 +126,7 @@ int gitt_repertory_pull(struct gitt_repertory *repertory)
 	gitt_log_debug("Step: start\n");
 	ssh = gitt_command_start_upload(repertory->url, repertory->privkey);
 	if (!ssh)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	gitt_log_debug("Step: get remote head\n");
 	ret = gitt_command_get_head(ssh, remote_head);
@@ -187,7 +187,7 @@ err1:
 	gitt_unpack_end(&repertory->unpack);
 err0:
 	gitt_command_end(ssh);
-	return -1;
+	return -GITT_ERRNO_INVAL;
 }
 
 int gitt_repertory_update_head(struct gitt_repertory *repertory)
@@ -197,7 +197,7 @@ int gitt_repertory_update_head(struct gitt_repertory *repertory)
 
 	ssh = gitt_command_start_upload(repertory->url, repertory->privkey);
 	if (!ssh)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	ret = gitt_command_get_head(ssh, repertory->head_sha1);
 	if (ret)
@@ -214,7 +214,7 @@ int gitt_repertory_update_head(struct gitt_repertory *repertory)
 
 err:
 	gitt_command_end(ssh);
-	return -1;
+	return -GITT_ERRNO_INVAL;
 }
 
 int gitt_repertory_end(struct gitt_repertory *repertory)

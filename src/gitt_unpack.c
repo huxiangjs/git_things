@@ -42,7 +42,7 @@ int gitt_unpack_init(struct gitt_unpack *unpack)
 {
 	if (!unpack->buf || unpack->buf_len < 20) {
 		gitt_log_error("Buffe cannot be empty and the length cannot be less than 20\n");
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	}
 
 	unpack->pack_state = GITT_UNPACK_STATE_INIT;
@@ -73,7 +73,7 @@ static int gitt_unpack_header_step(struct gitt_unpack *unpack, uint8_t *data, ui
 		if (data[index] != magic[unpack->pack_state]) {
 			unpack->pack_state = GITT_UNPACK_STATE_STOP;
 			gitt_log_error("File format is incorrect\n");
-			return -1;
+			return -GITT_ERRNO_INVAL;
 		}
 		index++;
 		unpack->pack_state++;
@@ -227,7 +227,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 fail:
 	gitt_zlib_compress_end(&unpack->zlib);
 	unpack->pack_state = GITT_UNPACK_STATE_STOP;
-	return -1;
+	return -GITT_ERRNO_INVAL;
 }
 
 static int gitt_unpack_verify_step(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
@@ -254,7 +254,7 @@ static int gitt_unpack_verify_step(struct gitt_unpack *unpack, uint8_t *data, ui
 		ret = gitt_sha1_digest(&unpack->sha1, sha1);
 		if (ret) {
 			gitt_log_error("SHA-1 digest fail\n");
-			return -1;
+			return -GITT_ERRNO_INVAL;
 		}
 
 		/* Callback */
@@ -285,7 +285,7 @@ int gitt_unpack_update(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
 
 	/* If an error occurs or has been completed, processing will not continue */
 	if (unpack->pack_state == GITT_UNPACK_STATE_STOP)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	/*
 	 * Using a state machine to parse byte by byte

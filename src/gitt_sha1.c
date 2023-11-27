@@ -28,6 +28,7 @@
  */
 
 #include <gitt_sha1.h>
+#include <gitt_errno.h>
 
 #define sha1_circular_shift(bits, word) \
 	(((word) << (bits)) | ((word) >> (32 - (bits))))
@@ -135,11 +136,11 @@ static void gitt_sha1_proc_block(struct gitt_sha1 *handle)
 int gitt_sha1_update(struct gitt_sha1 *handle, uint8_t *data, uint32_t size)
 {
 	if (!size)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	if (handle->computed || handle->corrupted) {
 		handle->corrupted = 1;
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	}
 
 	while (size-- && !handle->corrupted) {
@@ -203,7 +204,7 @@ int gitt_sha1_digest(struct gitt_sha1 *handle, uint8_t digest[20])
 	int i;
 
 	if (handle->corrupted)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	if (!handle->computed) {
 		gitt_sha1_pad(handle);

@@ -25,6 +25,7 @@
 #include <string.h>
 #include <gitt_log.h>
 #include <gitt_ssh.h>
+#include <gitt_errno.h>
 
 /* Please implement the following interfaces according to your system type */
 struct gitt_ssh* gitt_ssh_alloc_impl(void);
@@ -53,7 +54,7 @@ static int gitt_ssh_url_pad(struct gitt_ssh_url *ssh_url, const char *url)
 	while (url[i] && url[i] != '@' && j < sizeof(ssh_url->user))
 		ssh_url->user[j++] = url[i++];
 	if (j == sizeof(ssh_url->user))
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	ssh_url->user[j] = '\0';
 	i++;
 
@@ -62,7 +63,7 @@ static int gitt_ssh_url_pad(struct gitt_ssh_url *ssh_url, const char *url)
 	while (url[i] && url[i] != ':' && j < sizeof(ssh_url->host))
 		ssh_url->host[j++] = url[i++];
 	if (j == sizeof(ssh_url->host))
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	ssh_url->host[j] = '\0';
 	i++;
 
@@ -71,7 +72,7 @@ static int gitt_ssh_url_pad(struct gitt_ssh_url *ssh_url, const char *url)
 	while (url[i] && j < sizeof(ssh_url->repository))
 		ssh_url->repository[j++] = url[i++];
 	if (j == sizeof(ssh_url->repository))
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	ssh_url->repository[j] = '\0';
 	i++;
 
@@ -111,7 +112,7 @@ int gitt_ssh_connect(struct gitt_ssh *ssh, const char *url, const char *exec,
 	int err;
 
 	if (!ssh || !url || !exec || !privkey)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	err = gitt_ssh_url_pad(&ssh_url, url);
 	if (err)
@@ -127,7 +128,7 @@ int gitt_ssh_connect(struct gitt_ssh *ssh, const char *url, const char *exec,
 int gitt_ssh_read(struct gitt_ssh *ssh, char *buf, int size)
 {
 	if (!ssh)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	return gitt_ssh_read_impl(ssh, buf, size);
 }
@@ -135,7 +136,7 @@ int gitt_ssh_read(struct gitt_ssh *ssh, char *buf, int size)
 int gitt_ssh_write(struct gitt_ssh *ssh, char *buf, int size)
 {
 	if (!ssh)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	return gitt_ssh_write_impl(ssh, buf, size);
 }

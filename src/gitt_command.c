@@ -29,6 +29,7 @@
 #include <gitt_ssh.h>
 #include <gitt_log.h>
 #include <gitt_command.h>
+#include <gitt_errno.h>
 
 static struct gitt_ssh* gitt_command_start(const char *url, const char *privkey, char *type)
 {
@@ -58,7 +59,7 @@ static inline int8_t gitt_command_char_to_half_byte(char ch)
 		return ch - 'A' + 0xa;
 
 	gitt_log_debug("Unknown character: '%c'\n", ch);
-	return -1;
+	return -GITT_ERRNO_INVAL;
 }
 
 static int gitt_command_get_line_length(struct gitt_ssh* ssh)
@@ -72,7 +73,7 @@ static int gitt_command_get_line_length(struct gitt_ssh* ssh)
 	ret = gitt_ssh_read(ssh, buf, sizeof(buf));
 	if (ret != sizeof(buf)) {
 		gitt_log_debug("Failed to read 4 bytes\n");
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	}
 
 	ret = 0;
@@ -80,7 +81,7 @@ static int gitt_command_get_line_length(struct gitt_ssh* ssh)
 		ret <<= 4;
 		half_byte = gitt_command_char_to_half_byte(buf[count]);
 		if (half_byte < 0)
-			return -1;
+			return -GITT_ERRNO_INVAL;
 		ret |= half_byte;
 		count++;
 	}
@@ -106,7 +107,7 @@ int gitt_command_say_byebye(struct gitt_ssh* ssh)
 	ret = gitt_ssh_write(ssh, (char *)end, 5);
 	if (ret != 5) {
 		gitt_log_debug("Saying goodbye went wrong\n");
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	}
 
 	return 0;
@@ -122,12 +123,12 @@ int gitt_command_get_head(struct gitt_ssh* ssh, char sha1_hex[41])
 	length = gitt_command_get_line_length(ssh);
 	gitt_log_debug("First line length: %dbyte\n", length);
 	if (length < 4 + 40)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 
 	/* Read SHA-1 */
 	ret = gitt_ssh_read(ssh, sha1_hex, 40);
 	if (ret != 40)
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	sha1_hex[40] = '\0';
 	gitt_log_debug("HEAD: %s\n", sha1_hex);
 
@@ -139,7 +140,7 @@ int gitt_command_get_head(struct gitt_ssh* ssh, char sha1_hex[41])
 		ret = gitt_ssh_read(ssh, buf, ret);
 
 		if (ret <= 0)
-			return -1;
+			return -GITT_ERRNO_INVAL;
 
 		/* Replace: '\0' ==> '\n' */
 		for (index = 0; index < ret; index++)
@@ -156,7 +157,7 @@ int gitt_command_get_head(struct gitt_ssh* ssh, char sha1_hex[41])
 		gitt_log_debug("Line length: %dbyte\n", length);
 
 		if (length < 0)
-			return -1;
+			return -GITT_ERRNO_INVAL;
 		else if (length == 0)
 			break;
 		length -= 4;
@@ -166,7 +167,7 @@ int gitt_command_get_head(struct gitt_ssh* ssh, char sha1_hex[41])
 			ret = ret < length ? ret : length;
 			ret = gitt_ssh_read(ssh, buf, ret);
 			if (ret <= 0)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 
 			gitt_log_debug("%.*s", ret, buf);
 
@@ -212,7 +213,7 @@ int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[4
 	ret = gitt_ssh_write(ssh, line1, length);
 	if (ret != length) {
 		gitt_log_debug("Error writing line, at %d\n", __LINE__);
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	}
 
 	length = strlen(line2);
@@ -221,7 +222,7 @@ int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[4
 	ret = gitt_ssh_write(ssh, line2, length);
 	if (ret != length) {
 		gitt_log_debug("Error writing line, at %d\n", __LINE__);
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	}
 
 	if (have_sha1) {
@@ -232,7 +233,7 @@ int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[4
 		ret = gitt_ssh_write(ssh, line3, length);
 		if (ret != length) {
 			gitt_log_debug("Error writing line, at %d\n", __LINE__);
-			return -1;
+			return -GITT_ERRNO_INVAL;
 		}
 	}
 
@@ -242,7 +243,7 @@ int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[4
 	ret = gitt_ssh_write(ssh, line4, length);
 	if (ret != length) {
 		gitt_log_debug("Error writing line, at %d\n", __LINE__);
-		return -1;
+		return -GITT_ERRNO_INVAL;
 	}
 
 	return 0;
@@ -263,7 +264,7 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 		length = gitt_command_get_line_length(ssh);
 
 		if (length < 0)
-			return -1;
+			return -GITT_ERRNO_INVAL;
 		else if (length == 0)
 			break;
 		length -= 4;
@@ -273,7 +274,7 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 			ret = ret < length ? ret : length;
 			ret = gitt_ssh_read(ssh, buf, ret);
 			if (ret <= 0)
-				return -1;
+				return -GITT_ERRNO_INVAL;
 
 			pbuf = buf;
 			valid = ret;
@@ -305,7 +306,7 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 			if (type == 0x01) {
 				gitt_log_debug("+%dbyte\n", valid);
 				if (dump && dump(param, pbuf, valid))
-					return -1;
+					return -GITT_ERRNO_INVAL;
 			} else if (type == 0x02) {
 				gitt_log_debug("%.*s", valid, pbuf);
 			}
