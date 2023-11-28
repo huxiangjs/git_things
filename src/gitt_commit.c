@@ -249,3 +249,193 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 
 	return 0;
 }
+
+int gitt_commit_build(gitt_obj_data dump, void *p, struct gitt_commit *commit)
+{
+	int ret;
+	int length;
+
+	/* Tree line */
+	length = strlen(commit->tree.sha1);
+	if (length) {
+		ret = dump(p, (uint8_t *)"tree ", 5, false);
+		if (ret)
+			return ret;
+
+		ret = dump(p, (uint8_t *)commit->tree.sha1, length, false);
+		if (ret)
+			return ret;
+
+		ret = dump(p, (uint8_t *)"\n", 1, false);
+		if (ret)
+			return ret;
+	}
+
+	/* Parent line */
+	length = strlen(commit->parent.sha1);
+	if (length) {
+		ret = dump(p, (uint8_t *)"parent ", 7, false);
+		if (ret)
+			return ret;
+
+		ret = dump(p, (uint8_t *)commit->parent.sha1, length, false);
+		if (ret)
+			return ret;
+
+		ret = dump(p, (uint8_t *)"\n", 1, false);
+		if (ret)
+			return ret;
+	}
+
+	/* Author line */
+	ret = dump(p, (uint8_t *)"author ", 7, false);
+	if (ret)
+		return ret;
+
+	/* Author:Name */
+	length = strlen(commit->author.name);
+	ret = dump(p, (uint8_t *)commit->author.name, length, false);
+	if (ret)
+		return ret;
+
+	ret = dump(p, (uint8_t *)" <", 2, false);
+	if (ret)
+		return ret;
+
+	/* Author:Email */
+	length = strlen(commit->author.email);
+	ret = dump(p, (uint8_t *)commit->author.email, length, false);
+	if (ret)
+		return ret;
+
+	ret = dump(p, (uint8_t *)"> ", 2, false);
+	if (ret)
+		return ret;
+
+	/* Author:Date */
+	length = strlen(commit->author.date);
+	ret = dump(p, (uint8_t *)commit->author.date, length, false);
+	if (ret)
+		return ret;
+
+	ret = dump(p, (uint8_t *)" ", 1, false);
+	if (ret)
+		return ret;
+
+	/* Author:Zone */
+	length = strlen(commit->author.zone);
+	ret = dump(p, (uint8_t *)commit->author.zone, length, false);
+	if (ret)
+		return ret;
+
+	ret = dump(p, (uint8_t *)"\n", 1, false);
+	if (ret)
+		return ret;
+
+	/* Committer line */
+	ret = dump(p, (uint8_t *)"committer ", 10, false);
+	if (ret)
+		return ret;
+
+	/* Committer:Name */
+	length = strlen(commit->committer.name);
+	ret = dump(p, (uint8_t *)commit->committer.name, length, false);
+	if (ret)
+		return ret;
+
+	ret = dump(p, (uint8_t *)" <", 2, false);
+	if (ret)
+		return ret;
+
+	/* Committer:Email */
+	length = strlen(commit->committer.email);
+	ret = dump(p, (uint8_t *)commit->committer.email, length, false);
+	if (ret)
+		return ret;
+
+	ret = dump(p, (uint8_t *)"> ", 2, false);
+	if (ret)
+		return ret;
+
+	/* Committer:Date */
+	length = strlen(commit->committer.date);
+	ret = dump(p, (uint8_t *)commit->committer.date, length, false);
+	if (ret)
+		return ret;
+
+	ret = dump(p, (uint8_t *)" ", 1, false);
+	if (ret)
+		return ret;
+
+	/* Committer:Zone */
+	length = strlen(commit->committer.zone);
+	ret = dump(p, (uint8_t *)commit->committer.zone, length, false);
+	if (ret)
+		return ret;
+
+	ret = dump(p, (uint8_t *)"\n\n", 2, false);
+	if (ret)
+		return ret;
+
+	/* Message */
+	length = strlen(commit->message);
+	ret = dump(p, (uint8_t *)commit->message, length, true);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+uint16_t gitt_commit_length(struct gitt_commit *commit)
+{
+	int length;
+	uint16_t retval = 0;
+
+	/* Tree line */
+	length = strlen(commit->tree.sha1);
+	if (length)
+		retval += 5 + (uint16_t)length + 1;
+
+	/* Parent line */
+	length = strlen(commit->parent.sha1);
+	if (length)
+		retval += 7 + (uint16_t)length + 1;
+
+	/* Author:Name */
+	length = strlen(commit->author.name);
+	retval += 7 + (uint16_t)length + 2;
+
+	/* Author:Email */
+	length = strlen(commit->author.email);
+	retval += (uint16_t)length + 2;
+
+	/* Author:Date */
+	length = strlen(commit->author.date);
+	retval += (uint16_t)length + 1;
+
+	/* Author:Zone */
+	length = strlen(commit->author.zone);
+	retval += (uint16_t)length + 1;
+
+	/* Committer:Name */
+	length = strlen(commit->committer.name);
+	retval += 10 + (uint16_t)length + 2;
+
+	/* Committer:Email */
+	length = strlen(commit->committer.email);
+	retval += (uint16_t)length + 2;
+
+	/* Committer:Date */
+	length = strlen(commit->committer.date);
+	retval += (uint16_t)length + 1;
+
+	/* Committer:Zone */
+	length = strlen(commit->committer.zone);
+	retval += (uint16_t)length + 2;
+
+	/* Message */
+	length = strlen(commit->message);
+	retval += (uint16_t)length;
+
+	return retval;
+}

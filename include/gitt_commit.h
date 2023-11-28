@@ -25,7 +25,8 @@
 #ifndef __GITT_COMMIT_H_
 #define __GITT_COMMIT_H_
 
-#include <gitt_unpack.h>
+#include <stdint.h>
+#include <gitt_obj.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,6 +68,8 @@ struct gitt_commit {
 };
 
 int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit);
+int gitt_commit_build(gitt_obj_data dump, void *p, struct gitt_commit *commit);
+uint16_t gitt_commit_length(struct gitt_commit *commit);
 
 #ifdef __cplusplus
 }

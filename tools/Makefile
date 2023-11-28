@@ -31,7 +31,7 @@ CFLAGS := -I../include \
 
 .PHONY: all clean
 
-OBJS := test_sha1 test_zlib test_unpack
+OBJS := test_sha1 test_zlib test_unpack test_pack
 
 all: $(OBJS)
 
@@ -83,4 +83,24 @@ UNPACK_SRCS += ../third_party/zlib/zutil.c
 # UNPACK_SRCS += ../third_party/zlib/uncompr.c
 
 test_unpack: $(UNPACK_SRCS)
+	$(CC) $(CFLAGS) $^ -o $@
+
+
+# Test for pack
+PACK_SRCS := test_pack.c
+PACK_SRCS += ../src/gitt_sha1.c
+PACK_SRCS += ../src/gitt_pack.c
+PACK_SRCS += ../src/gitt_commit.c
+PACK_SRCS += ../src/gitt_misc.c
+PACK_SRCS += ../src/gitt_zlib.c
+PACK_SRCS += ../third_party/zlib/adler32.c
+PACK_SRCS += ../third_party/zlib/crc32.c
+PACK_SRCS += ../third_party/zlib/deflate.c
+PACK_SRCS += ../third_party/zlib/inffast.c
+PACK_SRCS += ../third_party/zlib/inflate.c
+PACK_SRCS += ../third_party/zlib/inftrees.c
+PACK_SRCS += ../third_party/zlib/trees.c
+PACK_SRCS += ../third_party/zlib/zutil.c
+
+test_pack: $(PACK_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@

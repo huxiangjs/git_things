@@ -22,37 +22,36 @@
  * SOFTWARE.
  */
 
-#ifndef __GITT_OBJ_H_
-#define __GITT_OBJ_H_
+#ifndef __GITT_PACK_H_
+#define __GITT_PACK_H_
 
 #include <stdint.h>
-#include <stdbool.h>
+#include <gitt_obj.h>
+#include <gitt_sha1.h>
+#include <gitt_zlib.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-typedef int (*gitt_obj_data)(void *p, uint8_t *buf, uint16_t size, bool end);
+typedef int (*gitt_pack_data)(void *p, uint8_t *buf, uint16_t size);
 
-struct gitt_obj {
-	uint8_t type;
-	uint16_t size;
-	void *data;
+struct gitt_pack {
+	uint8_t *buf;
+	uint16_t buf_len;
+	uint8_t obj_num;
+	uint8_t state;
+	struct gitt_sha1 sha1;
+	gitt_pack_data data_dump;
+	struct gitt_zlib zlib;
 };
 
-extern const char *gitt_obj_types[];
-
-#define GITT_OBJ_TYPE_COMMIT		1
-#define GITT_OBJ_TYPE_TREE		2
-#define GITT_OBJ_TYPE_BLOB		3
-#define GITT_OBJ_TYPE_TAG		4
-#define GITT_OBJ_TYPE_OFS_DELTA		6
-#define GITT_OBJ_TYPE_REF_DELTA		7
-
-#define GITT_OBJ_STR(no)	gitt_obj_types[no]
+int gitt_pack_init(struct gitt_pack *pack);
+int gitt_pack_update(struct gitt_pack *pack, struct gitt_obj *obj);
+void gitt_pack_end(struct gitt_pack *pack);
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
-#endif /* __GITT_OBJ_H_ */
+#endif /* __GITT_PACK_H_ */

@@ -201,9 +201,9 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 			if (in_size == 0 && unpack->obj.size == unpack->valid_len) {
 				gitt_log_debug("Decompress has been completed\n");
 				gitt_zlib_compress_end(&unpack->zlib);
-				unpack->obj.data = (char *)unpack->buf;
 				/* Anyway, we add the terminator to it */
-				unpack->obj.data[unpack->obj.size] = '\0';
+				unpack->buf[unpack->obj.size] = '\0';
+				unpack->obj.data = (char *)unpack->buf;
 				unpack->number--;
 				unpack->obj_state = GITT_UNPACK_STATE_INIT;
 
