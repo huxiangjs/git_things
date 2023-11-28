@@ -27,14 +27,14 @@
 #include <gitt_unpack.h>
 #include <gitt_errno.h>
 
-#define PACK_PATH	"../.git/objects/pack/pack-xxxxx.pack"
+#define PACK_PATH	"pack-test.pack"
 
 static void gitt_unpack_obj_callback(struct gitt_obj *obj)
 {
 #if 0
 	printf("%s: type:%s, size:%d\n", __func__, GITT_OBJ_STR(obj->type), obj->size);
 	if (obj->type == 1 || obj->type == 2)
-		printf("%.*s\n", obj->size, obj->data);
+		printf("%.*s\n", obj->size, (char *)obj->data);
 #else
 	printf("*");
 #endif
