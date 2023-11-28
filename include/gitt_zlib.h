@@ -26,6 +26,7 @@
 #define __GITT_ZLIB_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <zlib.h>
 
 #ifdef __cplusplus
@@ -40,7 +41,8 @@ void gitt_zlib_check(int ret);
 int gitt_zlib_compress_init(struct gitt_zlib *zlib);
 int gitt_zlib_compress_update(struct gitt_zlib *zlib,
 			      uint8_t *in, uint16_t *in_size,
-			      uint8_t *out, uint16_t *out_size);
+			      uint8_t *out, uint16_t *out_size,
+			      bool end);
 void gitt_zlib_compress_end(struct gitt_zlib *zlib);
 int gitt_zlib_decompress_init(struct gitt_zlib *zlib);
 int gitt_zlib_decompress_update(struct gitt_zlib *zlib,

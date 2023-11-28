@@ -32,20 +32,34 @@ static int gitt_zlib_compress(uint8_t *in, uint16_t *in_size,
 {
 	int ret;
 	struct gitt_zlib zlib;
+	uint16_t cost_in;
+	uint16_t cost_out;
+	uint16_t cost_in_count = 0;
+	uint16_t cost_out_count = 0;
 
 	ret = gitt_zlib_compress_init(&zlib);
 	if (ret)
 		return ret;
 
-	ret = gitt_zlib_compress_update(&zlib, in, in_size, out, out_size);
-	if (ret)
-		return ret;
+	/* Simulate segmented compress */
+	while (!ret && cost_in_count < *in_size) {
+		cost_in = *in_size - cost_in_count;
+		cost_in = cost_in < 30 ? cost_in : 30;
+		cost_out = *out_size - cost_out_count;
+		ret = gitt_zlib_compress_update(&zlib, in + cost_in_count, &cost_in,
+						out + cost_out_count, &cost_out,
+						(bool)(cost_in_count + cost_in == *in_size));
+		if (!cost_in)
+			break;
+		cost_in_count += cost_in;
+		cost_out_count += cost_out;
+	}
 
 	/* Number of bytes in the output buffer */
 	printf("Compressed %lu bytes into %lu bytes\n",
 	       zlib.stream.total_in, zlib.stream.total_out);
 	printf("Compressed %u bytes into %u bytes\n",
-	       *in_size, *out_size);
+	       cost_in_count, cost_out_count);
 
 	gitt_zlib_compress_end(&zlib);
 

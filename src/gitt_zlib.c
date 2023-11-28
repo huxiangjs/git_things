@@ -83,7 +83,8 @@ int gitt_zlib_compress_init(struct gitt_zlib *zlib)
 
 int gitt_zlib_compress_update(struct gitt_zlib *zlib,
 			      uint8_t *in, uint16_t *in_size,
-			      uint8_t *out, uint16_t *out_size)
+			      uint8_t *out, uint16_t *out_size,
+			      bool end)
 {
 	int ret;
 
@@ -93,7 +94,7 @@ int gitt_zlib_compress_update(struct gitt_zlib *zlib,
 	zlib->stream.avail_out = (uInt)*out_size;
 	zlib->stream.next_out = (Bytef *)out;
 
-	ret = deflate(&zlib->stream, Z_FINISH);
+	ret = deflate(&zlib->stream, end ? Z_FINISH : Z_NO_FLUSH);
 	if (ret != Z_OK && ret != Z_STREAM_END) {
 		gitt_zlib_check(ret);
 		*in_size = 0;

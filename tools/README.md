@@ -25,11 +25,12 @@ For testing and evaluating Git Things.
   $ make test_zlib
   gcc -I../include -I../third_party/zlib -DGITT_LOG_TO_STDIO test_zlib.c ../src/  gitt_zlib.c ../third_party/zlib/adler32.c ../third_party/zlib/crc32.c ../  third_party/zlib/deflate.c ../third_party/zlib/inffast.c ../third_party/zlib/  inflate.c ../third_party/zlib/inftrees.c ../third_party/zlib/trees.c ../  third_party/zlib/zutil.c -o test_zlib
   $ ./test_zlib 
+  zlib version: 1.3.0.1-motley
   00 01 ... fe ff
-  Compressed 1024 bytes into 426 bytes
-  Compressed 1024 bytes into 426 bytes
-  Decompressed 432 bytes into 1024 bytes
-  Decompressed 432 bytes into 1024 bytes
+  Compressed 1024 bytes into 286 bytes
+  Compressed 1024 bytes into 286 bytes
+  Decompressed 286 bytes into 1024 bytes
+  Decompressed 286 bytes into 1024 bytes
   00 01 ... fe ff
   ```
 
