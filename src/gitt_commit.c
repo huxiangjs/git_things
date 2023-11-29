@@ -439,3 +439,36 @@ uint16_t gitt_commit_length(struct gitt_commit *commit)
 
 	return retval;
 }
+
+static int gitt_obj_data_dump(void *p, uint8_t *buf, uint16_t size, bool end)
+{
+	return gitt_sha1_update((struct gitt_sha1 *)p, buf, size);
+}
+
+int gitt_commit_sha1_update(struct gitt_commit *commit)
+{
+	struct gitt_sha1 sha1;
+	int ret;
+	char front_str[16];
+
+	gitt_sha1_init(&sha1);
+
+	ret = sprintf(front_str, "commit %u", gitt_commit_length(commit));
+	if (ret <= 0)
+		return -GITT_ERRNO_INVAL;
+
+	ret = gitt_sha1_update(&sha1, (uint8_t *)front_str, ret + 1);
+	if (ret)
+		return ret;
+
+	ret = gitt_commit_build(gitt_obj_data_dump, &sha1, commit);
+	if (ret)
+		return ret;
+
+	ret = gitt_sha1_hexdigest(&sha1, commit->id.sha1);
+	if (ret)
+		return ret;
+
+	gitt_log_debug("SHA1: %s\n", commit->id.sha1);
+	return 0;
+}

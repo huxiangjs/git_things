@@ -75,6 +75,12 @@ static int test_pack(void)
 	commit.committer.name  = "Hoozz2";
 	commit.committer.zone  = "+081";
 	commit.message         = "Init for test";
+	ret = gitt_commit_sha1_update(&commit);
+	if (ret) {
+		printf("Update SHA-1 fail\n");
+		return ret;
+	}
+	printf("Commit id: %s\n", commit.id.sha1);
 
 	/* Initialize header */
 	pack.buf = buffer;
