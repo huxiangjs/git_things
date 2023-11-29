@@ -195,11 +195,6 @@ static void gitt_command_set_line_length(char *line, uint16_t length)
 		line[count] = tables[(length >> (12 - 4 * count)) & 0xf];
 }
 
-static void inline gitt_command_set_line_sha1(uint16_t offset, char *line, char *sha1)
-{
-	memcpy(line + offset, sha1, 40);
-}
-
 static int gitt_command_line_write(struct gitt_ssh* ssh, struct line_data *line, uint8_t part)
 {
 	char buf[5] = {0};
@@ -241,54 +236,38 @@ out:
 
 int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[41])
 {
-	char line1[] = "----want ---------------------------------------- "
-		       "multi_ack_detailed side-band-64k thin-pack include-tag "
-		       "ofs-delta deepen-since deepen-not agent=git/2.34.1\n";
-	char line2[] = "----";
-	char line3[] = "----have ----------------------------------------\n";
-        char line4[] = "----done\n";
-	int length;
+	struct line_data line[3];
 	int ret;
 
-	length = strlen(line1);
-	gitt_command_set_line_length(line1, length);
-	gitt_command_set_line_sha1(9, line1, want_sha1);
-	gitt_log_debug(line1);
-	ret = gitt_ssh_write(ssh, line1, length);
-	if (ret != length) {
-		gitt_log_debug("Error writing line, at %d\n", __LINE__);
-		return -GITT_ERRNO_INVAL;
-	}
+	line[0].data = "want ";
+	line[0].size = 5;
+	line[1].data = want_sha1;
+	line[1].size = 40;
+	line[2].data = " multi_ack_detailed side-band-64k thin-pack include-tag ofs-delta deepen-since deepen-not agent=git/2.34.1\n";
+	line[2].size = 107;
+	ret = gitt_command_line_write(ssh, line, 3);
+	if (ret)
+		return ret;
 
-	length = strlen(line2);
-	gitt_command_set_line_length(line2, length);
-	gitt_log_debug(line2);
-	ret = gitt_ssh_write(ssh, line2, length);
-	if (ret != length) {
-		gitt_log_debug("Error writing line, at %d\n", __LINE__);
-		return -GITT_ERRNO_INVAL;
-	}
+	ret = gitt_command_line_write(ssh, NULL, 0);
+	if (ret)
+		return ret;
 
 	if (have_sha1) {
-		length = strlen(line3);
-		gitt_command_set_line_length(line3, length);
-		gitt_command_set_line_sha1(9, line3, have_sha1);
-		gitt_log_debug(line3);
-		ret = gitt_ssh_write(ssh, line3, length);
-		if (ret != length) {
-			gitt_log_debug("Error writing line, at %d\n", __LINE__);
-			return -GITT_ERRNO_INVAL;
-		}
+		line[0].data = "have ";
+		line[0].size = 5;
+		line[1].data = have_sha1;
+		line[1].size = 40;
+		ret = gitt_command_line_write(ssh, line, 2);
+		if (ret)
+			return ret;
 	}
 
-	length = strlen(line4);
-	gitt_command_set_line_length(line4, length);
-	gitt_log_debug(line4);
-	ret = gitt_ssh_write(ssh, line4, length);
-	if (ret != length) {
-		gitt_log_debug("Error writing line, at %d\n", __LINE__);
-		return -GITT_ERRNO_INVAL;
-	}
+	line[0].data = "done\n";
+	line[0].size = 5;
+	ret = gitt_command_line_write(ssh, line, 1);
+	if (ret)
+		return ret;
 
 	return 0;
 }

@@ -98,10 +98,10 @@ int main(int args, char *argv[])
 #endif
 
 #if 0
-	strcpy(repertory.head_sha1, "e5ceb02e938f16285e684ac2976dc35c6adcb674");
+	strcpy(repertory.head_sha1, "cbf882f5cee5b31021b9021bd5ea4e387158000d");
 #endif
 
-#if 0
+#if 1
 	ret = gitt_repertory_pull(&repertory);
 	if (ret) {
 		printf("An error occurred while pull the repertory\n");
@@ -117,7 +117,7 @@ int main(int args, char *argv[])
 	}
 #endif
 
-#if 1
+#if 0
 	{
 		struct gitt_commit commit = {0};
 
