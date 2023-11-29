@@ -38,7 +38,7 @@ static void gitt_obj_dump_callback(struct gitt_obj *obj)
 
 	gitt_log_debug("type:%s, size:%d\n", GITT_OBJ_STR(obj->type), obj->size);
 
-	if (obj->type == 1 && repertory->commit_dump) {
+	if (obj->type == GITT_OBJ_TYPE_COMMIT && repertory->commit_dump) {
 		ret = gitt_commit_parse(obj->data, obj->size, &commit);
 		if (!ret)
 			repertory->commit_dump(&commit);
@@ -104,10 +104,68 @@ int gitt_repertory_clone(struct gitt_repertory *repertory)
 	return gitt_repertory_pull(repertory);
 }
 
-int gitt_repertory_push(struct gitt_repertory *repertory)
+static int gitt_pack_data_dump_callback(void *p, uint8_t *buf, uint16_t size)
 {
+	struct gitt_repertory *repertory = gitt_containerof(p, struct gitt_repertory, pack);
+
+	gitt_log_debug("write pack: %ubyte\n", size);
+	return gitt_command_write_pack(repertory->ssh, buf, size);
+}
+
+int gitt_repertory_push_commit(struct gitt_repertory *repertory, struct gitt_commit *commit)
+{
+	int ret;
+	struct gitt_obj obj;
+	char remote_head[41];
+
+	gitt_log_debug("Step: start\n");
+	repertory->ssh = gitt_command_start_receive(repertory->url, repertory->privkey);
+	if (!repertory->ssh)
+		return -GITT_ERRNO_INVAL;
+
+	gitt_log_debug("Step: get remote head\n");
+	ret = gitt_command_get_head(repertory->ssh, remote_head);
+	if (ret)
+		goto err0;
+
+	gitt_log_debug("Step: set pack\n");
+	ret = gitt_command_set_pack(repertory->ssh, remote_head, commit->id.sha1,
+				    "refs/heads/main");
+	if (ret)
+		goto err0;
+
+	/* Initialize header */
+	repertory->pack.buf = repertory->buf;
+	repertory->pack.buf_len = repertory->buf_len;
+	repertory->pack.obj_num = 1;
+	repertory->pack.data_dump = gitt_pack_data_dump_callback;
+	ret = gitt_pack_init(&repertory->pack);
+	if (ret)
+		goto err0;
+
+	/* Update to pack */
+	obj.type = GITT_OBJ_TYPE_COMMIT;
+	obj.data = commit;
+	obj.size = gitt_commit_length(commit);
+	ret = gitt_pack_update(&repertory->pack, &obj);
+	if (ret)
+		goto err1;
+
+	gitt_pack_end(&repertory->pack);
+
+	ret = gitt_command_get_state(repertory->ssh);
+	if (ret)
+		goto err0;
+
+	gitt_command_end(repertory->ssh);
 
 	return 0;
+
+err1:
+	gitt_pack_end(&repertory->pack);
+err0:
+	gitt_command_end(repertory->ssh);
+	return ret;
 }
 
 /**
@@ -119,17 +177,16 @@ int gitt_repertory_push(struct gitt_repertory *repertory)
  */
 int gitt_repertory_pull(struct gitt_repertory *repertory)
 {
-	struct gitt_ssh* ssh;
 	int ret;
 	char remote_head[41];
 
 	gitt_log_debug("Step: start\n");
-	ssh = gitt_command_start_upload(repertory->url, repertory->privkey);
-	if (!ssh)
+	repertory->ssh = gitt_command_start_upload(repertory->url, repertory->privkey);
+	if (!repertory->ssh)
 		return -GITT_ERRNO_INVAL;
 
 	gitt_log_debug("Step: get remote head\n");
-	ret = gitt_command_get_head(ssh, remote_head);
+	ret = gitt_command_get_head(repertory->ssh, remote_head);
 	if (ret)
 		goto err0;
 
@@ -137,7 +194,7 @@ int gitt_repertory_pull(struct gitt_repertory *repertory)
 	if (!strlen(repertory->head_sha1)) {
 		gitt_log_debug("Step: clone\n");
 
-		ret = gitt_command_want(ssh, remote_head, NULL);
+		ret = gitt_command_want(repertory->ssh, remote_head, NULL);
 		if (ret)
 			goto err0;
 
@@ -146,7 +203,7 @@ int gitt_repertory_pull(struct gitt_repertory *repertory)
 	} else if (memcmp(repertory->head_sha1, remote_head, sizeof(remote_head))) {
 		gitt_log_debug("Step: pull\n");
 
-		ret = gitt_command_want(ssh, remote_head, repertory->head_sha1);
+		ret = gitt_command_want(repertory->ssh, remote_head, repertory->head_sha1);
 		if (ret)
 			goto err0;
 
@@ -155,11 +212,11 @@ int gitt_repertory_pull(struct gitt_repertory *repertory)
 	} else {
 		gitt_log_debug("Already up to date\n");
 
-		ret = gitt_command_say_byebye(ssh);
+		ret = gitt_command_say_byebye(repertory->ssh);
 		if (ret)
 			goto err0;
 
-		gitt_command_end(ssh);
+		gitt_command_end(repertory->ssh);
 		return 0;
 	}
 
@@ -174,19 +231,20 @@ int gitt_repertory_pull(struct gitt_repertory *repertory)
 		goto err0;
 
 	gitt_log_debug("Step: get pack\n");
-	ret = gitt_command_get_pack(ssh, gitt_command_pack_dump_callback, &repertory->unpack);
+	ret = gitt_command_get_pack(repertory->ssh, gitt_command_pack_dump_callback,
+				    &repertory->unpack);
 	if (ret)
 		goto err1;
 
 	gitt_unpack_end(&repertory->unpack);
-	gitt_command_end(ssh);
+	gitt_command_end(repertory->ssh);
 
 	return 0;
 
 err1:
 	gitt_unpack_end(&repertory->unpack);
 err0:
-	gitt_command_end(ssh);
+	gitt_command_end(repertory->ssh);
 	return -GITT_ERRNO_INVAL;
 }
 

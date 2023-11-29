@@ -27,6 +27,8 @@
 
 #include <gitt_unpack.h>
 #include <gitt_commit.h>
+#include <gitt_pack.h>
+#include <gitt_ssh.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,17 +38,20 @@ typedef void (*gitt_repertory_commit)(struct gitt_commit *commit);
 
 struct gitt_repertory {
 	struct gitt_unpack unpack;
+	struct gitt_pack pack;
 	char *url;
 	char *privkey;
 	char head_sha1[41];
 	uint8_t *buf;
 	uint16_t buf_len;
 	gitt_repertory_commit commit_dump;
+	struct gitt_ssh* ssh;
 };
 
 int gitt_repertory_init(struct gitt_repertory *repertory);
 int gitt_repertory_clone(struct gitt_repertory *repertory);
-int gitt_repertory_push(struct gitt_repertory *repertory);
+int gitt_repertory_push_commit(struct gitt_repertory *repertory,
+			       struct gitt_commit *commit);
 int gitt_repertory_pull(struct gitt_repertory *repertory);
 int gitt_repertory_update_head(struct gitt_repertory *repertory);
 int gitt_repertory_end(struct gitt_repertory *repertory);

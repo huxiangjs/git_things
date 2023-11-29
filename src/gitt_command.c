@@ -31,6 +31,11 @@
 #include <gitt_command.h>
 #include <gitt_errno.h>
 
+struct line_data {
+	char *data;
+	uint16_t size;
+};
+
 static struct gitt_ssh* gitt_command_start(const char *url, const char *privkey, char *type)
 {
 	struct gitt_ssh* ssh = gitt_ssh_alloc();
@@ -195,6 +200,45 @@ static void inline gitt_command_set_line_sha1(uint16_t offset, char *line, char 
 	memcpy(line + offset, sha1, 40);
 }
 
+static int gitt_command_line_write(struct gitt_ssh* ssh, struct line_data *line, uint8_t part)
+{
+	char buf[5] = {0};
+	uint16_t length;
+	int ret;
+	uint8_t i;
+
+	/* Total line size */
+	length = 0;
+	for (i = 0; i < part; i++)
+		length += line[i].size;
+
+	if (length)
+		length += 4;
+
+	gitt_command_set_line_length(buf, length);
+	gitt_log_debug(buf);
+	ret = gitt_ssh_write(ssh, buf, 4);
+	if (ret != 4) {
+		gitt_log_debug("Error writing line, at %d\n", __LINE__);
+		return -GITT_ERRNO_INVAL;
+	}
+
+	if (!length)
+		goto out;
+
+	for (i = 0; i < part; i++) {
+		gitt_log_debug(line[i].data);
+		ret = gitt_ssh_write(ssh, line[i].data, line[i].size);
+		if (ret != line[i].size) {
+			gitt_log_debug("Error writing line, at %d\n", __LINE__);
+			return -GITT_ERRNO_INVAL;
+		}
+	}
+
+out:
+	return 0;
+}
+
 int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[41])
 {
 	char line1[] = "----want ---------------------------------------- "
@@ -309,6 +353,92 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 					return -GITT_ERRNO_INVAL;
 			} else if (type == 0x02) {
 				gitt_log_debug("%.*s", valid, pbuf);
+			}
+
+			length -= ret;
+			new_line = false;
+		}
+	}
+
+	return 0;
+}
+
+int gitt_command_set_pack(struct gitt_ssh* ssh, const char *head, const char *id, const char *refs)
+{
+	struct line_data line[7];
+	int ret;
+
+	/* First line */
+	line[0].data = (char *)head;
+	line[0].size = 40;
+	line[1].data = " ";
+	line[1].size = 1;
+	line[2].data = (char *)id;
+	line[2].size = 40;
+	line[3].data = " ";
+	line[3].size = 1;
+	line[4].data = (char *)refs;
+	line[4].size = strlen(refs);
+	line[5].data = "\0 ";
+	line[5].size = 2;
+	line[6].data = "report-status-v2 side-band-64k object-format=sha1 agent=git/2.34.1";
+	line[6].size = 66;
+	ret = gitt_command_line_write(ssh, line, 7);
+	if (ret)
+		return ret;
+
+	ret = gitt_command_line_write(ssh, NULL, 0);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+int gitt_command_write_pack(struct gitt_ssh* ssh, uint8_t *buf, uint16_t size)
+{
+	int ret;
+
+	ret = gitt_ssh_write(ssh, (char *)buf, size);
+	if (ret != size) {
+		gitt_log_debug("Error writing pack\n");
+		return -GITT_ERRNO_INVAL;
+	}
+
+	return 0;
+}
+
+int gitt_command_get_state(struct gitt_ssh* ssh)
+{
+	char buf[32];
+	int length;
+	int ret;
+	bool new_line;
+	char *pbuf;
+	int valid;
+
+	while (1) {
+		new_line = true;
+		length = gitt_command_get_line_length(ssh);
+
+		if (length < 0)
+			return -GITT_ERRNO_INVAL;
+		else if (length == 0)
+			break;
+		length -= 4;
+
+		while (length) {
+			ret = sizeof(buf);
+			ret = ret < length ? ret : length;
+			ret = gitt_ssh_read(ssh, buf, ret);
+			if (ret <= 0)
+				return -GITT_ERRNO_INVAL;
+
+			pbuf = buf;
+			valid = ret;
+
+			if (new_line) {
+				// TODO: Here we need to judge whether the return value confirmation is successful
+				gitt_log_info("%.*s", valid, pbuf);
 			}
 
 			length -= ret;

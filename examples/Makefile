@@ -51,6 +51,7 @@ GITT_SRCS += ../src/gitt_zlib.c
 GITT_SRCS += ../src/gitt_command.c
 GITT_SRCS += ../src/gitt_repertory.c
 GITT_SRCS += ../src/gitt_commit.c
+GITT_SRCS += ../src/gitt_pack.c
 GITT_SRCS += ../third_party/zlib/adler32.c
 GITT_SRCS += ../third_party/zlib/crc32.c
 GITT_SRCS += ../third_party/zlib/deflate.c

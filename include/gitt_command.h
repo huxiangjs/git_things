@@ -41,6 +41,9 @@ void gitt_command_end(struct gitt_ssh* ssh);
 int gitt_command_say_byebye(struct gitt_ssh* ssh);
 int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[41]);
 int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, void *param);
+int gitt_command_set_pack(struct gitt_ssh* ssh, const char *head, const char *id, const char *refs);
+int gitt_command_write_pack(struct gitt_ssh* ssh, uint8_t *buf, uint16_t size);
+int gitt_command_get_state(struct gitt_ssh* ssh);
 
 #ifdef __cplusplus
 }

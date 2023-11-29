@@ -170,9 +170,11 @@ done:
 		if (ret)
 			return ret;
 
-		ret = pack->data_dump(pack, pack->buf, 20);
-		if (ret)
-			return ret;
+		if (pack->data_dump) {
+			ret = pack->data_dump(pack, pack->buf, 20);
+			if (ret)
+				return ret;
+		}
 
 		pack->state = GITT_PACK_STATE_STOP;
 	}

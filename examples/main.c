@@ -28,7 +28,7 @@
 #include <gitt_commit.h>
 
 #define PRIVKEY_PATH	"/home/huxiang/.ssh/id_ed25519"
-#define REPERTORY_URL	"git@github.com:huxiangjs/git_things.git"
+#define REPERTORY_URL	"git@github.com:huxiangjs/gitt_test.git"
 
 static void __replace(char src, char tag, char *buf, int buf_size)
 {
@@ -95,21 +95,55 @@ int main(int args, char *argv[])
 		printf("An error occurred while update head\n");
 		return -1;
 	}
-#else
+#endif
+
+#if 0
 	strcpy(repertory.head_sha1, "e5ceb02e938f16285e684ac2976dc35c6adcb674");
 #endif
 
+#if 0
 	ret = gitt_repertory_pull(&repertory);
 	if (ret) {
 		printf("An error occurred while pull the repertory\n");
 		return -1;
 	}
+#endif
 
 #if 0
 	ret = gitt_repertory_clone(&repertory);
 	if (ret) {
 		printf("An error occurred while clone the repertory\n");
 		return -1;
+	}
+#endif
+
+#if 1
+	{
+		struct gitt_commit commit = {0};
+
+		/* Initialize commit */
+		commit.tree.sha1       = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+		commit.parent.sha1     = "cbf882f5cee5b31021b9021bd5ea4e387158000d";
+		commit.author.date     = "170098713";
+		commit.author.email    = "huxiangjs1@foxmail.com";
+		commit.author.name     = "Hoozz1";
+		commit.author.zone     = "+080";
+		commit.committer.date  = "170098714";
+		commit.committer.email = "huxiangjs2@foxmail.com";
+		commit.committer.name  = "Hoozz2";
+		commit.committer.zone  = "+081";
+		commit.message         = "Init for test hahahahhahahah";
+		ret = gitt_commit_sha1_update(&commit);
+		if (ret) {
+			printf("An error occurred while update SHA-1\n");
+			return -1;
+		}
+
+		ret = gitt_repertory_push_commit(&repertory, &commit);
+		if (ret) {
+			printf("An error occurred while push commit the repertory\n");
+			return -1;
+		}
 	}
 #endif
 
