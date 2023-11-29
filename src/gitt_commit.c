@@ -177,7 +177,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			next = gitt_commit_find_line_char(start, valid_size, ' ');
 			if (!next)
 				return -GITT_ERRNO_INVAL;
-			*(next - 1) = '\0';
+			*next = '\0';
 			commit->author.date = start;
 			valid_size -= next - start + 1;
 			start = next + 1;
@@ -186,7 +186,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			next = gitt_commit_find_line_end(start, valid_size, 'D');
 			if (!next)
 				return -GITT_ERRNO_INVAL;
-			*(next - 1) = '\0';
+			*next = '\0';
 			commit->author.zone = start;
 			valid_size -= next - start + 1;
 			start = next + 1;
@@ -216,7 +216,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			next = gitt_commit_find_line_char(start, valid_size, ' ');
 			if (!next)
 				return -GITT_ERRNO_INVAL;
-			*(next - 1) = '\0';
+			*next = '\0';
 			commit->committer.date = start;
 			valid_size -= next - start + 1;
 			start = next + 1;
@@ -225,7 +225,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			next = gitt_commit_find_line_end(start, valid_size, 'D');
 			if (!next)
 				return -GITT_ERRNO_INVAL;
-			*(next - 1) = '\0';
+			*next = '\0';
 			commit->committer.zone = start;
 			valid_size -= next - start + 1;
 			start = next + 1;
