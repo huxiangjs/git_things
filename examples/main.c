@@ -117,21 +117,21 @@ int main(int args, char *argv[])
 	}
 #endif
 
-#if 0
+#if 1
 	{
 		struct gitt_commit commit = {0};
 
 		/* Initialize commit */
 		commit.tree.sha1       = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 		commit.parent.sha1     = "cbf882f5cee5b31021b9021bd5ea4e387158000d";
-		commit.author.date     = "170098713";
+		commit.author.date     = "1700987133";
 		commit.author.email    = "huxiangjs1@foxmail.com";
 		commit.author.name     = "Hoozz1";
-		commit.author.zone     = "+080";
-		commit.committer.date  = "170098714";
+		commit.author.zone     = "+0800";
+		commit.committer.date  = "1700987134";
 		commit.committer.email = "huxiangjs2@foxmail.com";
 		commit.committer.name  = "Hoozz2";
-		commit.committer.zone  = "+081";
+		commit.committer.zone  = "+0800";
 		commit.message         = "Init for test hahahahhahahah";
 		ret = gitt_commit_sha1_update(&commit);
 		if (ret) {
