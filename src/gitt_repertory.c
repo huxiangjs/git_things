@@ -88,6 +88,9 @@ int gitt_repertory_init(struct gitt_repertory *repertory)
 		return -GITT_ERRNO_INVAL;
 	}
 
+	repertory->head_sha1[0] = '\0';
+	repertory->ssh = NULL;
+
 	return 0;
 }
 
