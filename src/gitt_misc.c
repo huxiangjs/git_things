@@ -34,7 +34,7 @@ const char *gitt_obj_types[] = {
 };
 
 const char *gitt_errno_types[] = {
-	"No errors",
+	"Successful",
 	"Invalid parameter",
 	"Not enough memory",
 	"Please try again"

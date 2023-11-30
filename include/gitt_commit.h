@@ -32,6 +32,8 @@
 extern "C" {
 #endif /* __cplusplus */
 
+#define GITT_COMMIT_AUTO_BASE		"-"
+
 struct gitt_commit_id {
 	char sha1[41];
 };

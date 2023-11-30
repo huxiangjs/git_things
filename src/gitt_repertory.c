@@ -131,6 +131,17 @@ int gitt_repertory_push_commit(struct gitt_repertory *repertory, struct gitt_com
 	if (ret)
 		goto err0;
 
+	/* Auto base */
+	if (commit->parent.sha1 && !strcmp(commit->parent.sha1, GITT_COMMIT_AUTO_BASE))
+		commit->parent.sha1 = remote_head;
+
+	/* Update commit id */
+	ret = gitt_commit_sha1_update(commit);
+	if (ret) {
+		gitt_log_error("Update commit id fail\n");
+		goto err0;
+	}
+
 	gitt_log_debug("Step: set pack\n");
 	ret = gitt_command_set_pack(repertory->ssh, remote_head, commit->id.sha1,
 				    "refs/heads/main");

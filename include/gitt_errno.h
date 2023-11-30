@@ -36,7 +36,7 @@ extern const char *gitt_errno_types[];
 #define GITT_ERRNO_NOMEM		2
 #define GITT_ERRNO_RETRY		3
 
-#define GITT_ERRNO_STR(no)	gitt_errno_types[no]
+#define GITT_ERRNO_STR(no)	gitt_errno_types[-no]
 
 #ifdef __cplusplus
 }
