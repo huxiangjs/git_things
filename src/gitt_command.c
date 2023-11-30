@@ -210,6 +210,7 @@ static int gitt_command_line_write(struct gitt_ssh* ssh, struct line_data *line,
 	if (length)
 		length += 4;
 
+	/* Set the length of the line and write */
 	gitt_command_set_line_length(buf, length);
 	gitt_log_debug(buf);
 	ret = gitt_ssh_write(ssh, buf, 4);
@@ -221,6 +222,7 @@ static int gitt_command_line_write(struct gitt_ssh* ssh, struct line_data *line,
 	if (!length)
 		goto out;
 
+	/* Write each part of the line */
 	for (i = 0; i < part; i++) {
 		gitt_log_debug(line[i].data);
 		ret = gitt_ssh_write(ssh, line[i].data, line[i].size);
@@ -253,6 +255,7 @@ int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[4
 	if (ret)
 		return ret;
 
+	/* If there is, then add this line */
 	if (have_sha1) {
 		line[0].data = "have ";
 		line[0].size = 5;
@@ -284,6 +287,7 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 
 	while (1) {
 		new_line = true;
+		/* Read line length */
 		length = gitt_command_get_line_length(ssh);
 
 		if (length < 0)
@@ -303,6 +307,7 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 			valid = ret;
 
 			if (new_line) {
+				/* Parse the data type of each line */
 				if (buf[0] == 0x01) {
 					pbuf++;
 					valid--;
@@ -326,6 +331,7 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 				}
 			}
 
+			/* Process this line of data */
 			if (type == 0x01) {
 				gitt_log_debug("+%dbyte\n", valid);
 				if (dump && dump(param, pbuf, valid))
@@ -392,9 +398,10 @@ int gitt_command_get_state(struct gitt_ssh* ssh)
 	int length;
 	int ret;
 	bool new_line;
-	char *pbuf;
-	int valid;
+	uint8_t line_count;
+	int retval = 0;
 
+	line_count = 0;
 	while (1) {
 		new_line = true;
 		length = gitt_command_get_line_length(ssh);
@@ -411,21 +418,28 @@ int gitt_command_get_state(struct gitt_ssh* ssh)
 			ret = gitt_ssh_read(ssh, buf, ret);
 			if (ret <= 0)
 				return -GITT_ERRNO_INVAL;
-
-			pbuf = buf;
-			valid = ret;
+			gitt_log_debug("%.*s", ret, buf);
 
 			if (new_line) {
-				// TODO: Here we need to judge whether the return value confirmation is successful
-				gitt_log_info("%.*s", valid, pbuf);
+				/* Remote return: 'ok' or 'ng' */
+				if (line_count == 2 && buf[0] == 0x01 && ret >= 7) {
+					if(buf[5] != 'o' || buf[6] != 'k') {
+						retval = -GITT_ERRNO_RETRY;
+						gitt_log_error("Remote said: Not good\n");
+					} else {
+						gitt_log_debug("Remote said: OK\n");
+					}
+				}
 			}
 
 			length -= ret;
 			new_line = false;
 		}
+
+		line_count++;
 	}
 
-	return 0;
+	return retval;
 }
 
 void gitt_command_end(struct gitt_ssh* ssh)
