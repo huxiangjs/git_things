@@ -309,6 +309,7 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 			if (new_line) {
 				/* Parse the data type of each line */
 				if (buf[0] == 0x01) {
+					gitt_log_debug("Pack size: %dbyte\n", length);
 					pbuf++;
 					valid--;
 					type = 0x01;

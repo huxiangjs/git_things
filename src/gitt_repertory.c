@@ -121,12 +121,12 @@ int gitt_repertory_push_commit(struct gitt_repertory *repertory, struct gitt_com
 	struct gitt_obj obj;
 	char remote_head[41];
 
-	gitt_log_debug("Step: start\n");
+	gitt_log_debug("Start connecting\n");
 	repertory->ssh = gitt_command_start_receive(repertory->url, repertory->privkey);
 	if (!repertory->ssh)
 		return -GITT_ERRNO_INVAL;
 
-	gitt_log_debug("Step: get remote head\n");
+	gitt_log_debug("Get remote head\n");
 	ret = gitt_command_get_head(repertory->ssh, remote_head);
 	if (ret)
 		goto err0;
@@ -149,7 +149,7 @@ int gitt_repertory_push_commit(struct gitt_repertory *repertory, struct gitt_com
 		goto err0;
 	}
 
-	gitt_log_debug("Step: set pack\n");
+	gitt_log_debug("Set pack\n");
 	ret = gitt_command_set_pack(repertory->ssh, remote_head, commit->id.sha1,
 				    "refs/heads/main");
 	if (ret)
@@ -182,6 +182,7 @@ int gitt_repertory_push_commit(struct gitt_repertory *repertory, struct gitt_com
 
 	/* Update head */
 	memcpy(repertory->head_sha1, remote_head, sizeof(remote_head));
+	gitt_log_debug("Head updated: %s\n", repertory->head_sha1);
 
 	return 0;
 
@@ -204,19 +205,19 @@ int gitt_repertory_pull(struct gitt_repertory *repertory)
 	int ret;
 	char remote_head[41];
 
-	gitt_log_debug("Step: start\n");
+	gitt_log_debug("Start connecting\n");
 	repertory->ssh = gitt_command_start_upload(repertory->url, repertory->privkey);
 	if (!repertory->ssh)
 		return -GITT_ERRNO_INVAL;
 
-	gitt_log_debug("Step: get remote head\n");
+	gitt_log_debug("Get remote head\n");
 	ret = gitt_command_get_head(repertory->ssh, remote_head);
 	if (ret)
 		goto err0;
 
 	/* Clone || Pull */
 	if (!strlen(repertory->head_sha1)) {
-		gitt_log_debug("Step: clone\n");
+		gitt_log_debug("Start clone\n");
 
 		ret = gitt_command_want(repertory->ssh, remote_head, NULL);
 		if (ret)
@@ -224,8 +225,9 @@ int gitt_repertory_pull(struct gitt_repertory *repertory)
 
 		/* Update head */
 		memcpy(repertory->head_sha1, remote_head, sizeof(remote_head));
+		gitt_log_debug("Head updated: %s\n", repertory->head_sha1);
 	} else if (memcmp(repertory->head_sha1, remote_head, sizeof(remote_head))) {
-		gitt_log_debug("Step: pull\n");
+		gitt_log_debug("Start pull\n");
 
 		ret = gitt_command_want(repertory->ssh, remote_head, repertory->head_sha1);
 		if (ret)
@@ -233,6 +235,7 @@ int gitt_repertory_pull(struct gitt_repertory *repertory)
 
 		/* Update head */
 		memcpy(repertory->head_sha1, remote_head, sizeof(remote_head));
+		gitt_log_debug("Head updated: %s\n", repertory->head_sha1);
 	} else {
 		gitt_log_debug("Already up to date\n");
 
@@ -254,7 +257,7 @@ int gitt_repertory_pull(struct gitt_repertory *repertory)
 	if (ret)
 		goto err0;
 
-	gitt_log_debug("Step: get pack\n");
+	gitt_log_debug("Get pack\n");
 	ret = gitt_command_get_pack(repertory->ssh, gitt_command_pack_dump_callback,
 				    &repertory->unpack);
 	if (ret)
@@ -290,7 +293,7 @@ int gitt_repertory_update_head(struct gitt_repertory *repertory)
 		goto err;
 
 	gitt_command_end(ssh);
-	gitt_log_debug("SHA-1 updated: %s\n", repertory->head_sha1);
+	gitt_log_debug("Head updated: %s\n", repertory->head_sha1);
 
 	return 0;
 
