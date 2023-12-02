@@ -24,6 +24,8 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
 #include <pwd.h>
 #include <string.h>
 #include <malloc.h>
@@ -37,6 +39,8 @@
 
 #define EXAMPLE_STATE_INIT		0
 #define EXAMPLE_STATE_RUN		1
+
+#define DEFAULT_LOOP_TIME		5
 
 struct gitt_example {
 	struct gitt g;
@@ -253,6 +257,63 @@ static int cmd_func_help(struct gitt_example *example, int args, char *argv[])
 	return 0;
 }
 
+static int hit(void)
+{
+	struct termios oldt, newt;
+	int ch;
+	int oldf;
+
+	tcgetattr(STDIN_FILENO, &oldt);
+	newt = oldt;
+	newt.c_lflag &= ~(ICANON | ECHO);
+	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+	oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+	fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+	ch = getchar();
+
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+	fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+	if (ch != EOF)
+		return ch;
+
+	return 0;
+}
+
+static int cmd_func_loop(struct gitt_example *example, int args, char *argv[])
+{
+	int interval = DEFAULT_LOOP_TIME;
+	int ret;
+
+	if (example->state != EXAMPLE_STATE_RUN) {
+		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
+		return -1;
+	}
+
+	if (args >= 2)
+		sscanf(argv[1], "%d", &interval);
+
+	printf("Interval time: %d second\n", interval);
+	printf("Entering the loop, you can press any key to end it\n");
+
+	while (1) {
+		ret = gitt_update_event(&example->g);
+		// printf("Update event result: %s\n", GITT_ERRNO_STR(ret));
+		if (ret)
+			break;
+
+		if (hit())
+			break;
+
+		sleep(interval);
+	}
+
+	printf("\nExit loop\n");
+
+	return 0;
+}
+
 static int cmd_func_exit(struct gitt_example *example, int args, char *argv[])
 {
 	gitt_end(&example->g);
@@ -266,6 +327,7 @@ static struct cmd_item cmd_list[] = {
 	{"exit",    cmd_func_exit,    "exit                        -- Exit GITT"},
 	{"history", cmd_func_history, "history                     -- View historical events"},
 	{"commit",  cmd_func_commit,  "commit [event]              -- Commit a event"},
+	{"loop",    cmd_func_loop,    "loop <time>                 -- Loop to get events"},
 	{"help",    cmd_func_help,    "help                        -- Show help"},
 };
 
@@ -348,7 +410,7 @@ int main(int args, char *argv[])
 		}
 	}
 
-	printf("Loop exit\n");
+	printf("Exited\n");
 
 	return 0;
 }
