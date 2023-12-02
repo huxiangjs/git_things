@@ -23,15 +23,39 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
+#include <pwd.h>
 #include <string.h>
 #include <malloc.h>
 #include <gitt.h>
 #include <gitt_errno.h>
 
-#define PRIVKEY_PATH	"/home/huxiang/.ssh/id_ed25519"
-#define REPERTORY_URL	"git@github.com:huxiangjs/gitt_test.git"
+#define DEFAULT_PRIVKEY_PATH		"id_ed25519"
 
-static void __replace(char src, char tag, char *buf, int buf_size)
+#define EXAMPLE_DEVICE_NAME		"Example Device"
+#define EXAMPLE_DEVICE_ID		"0000000000000000"
+
+#define EXAMPLE_STATE_INIT		0
+#define EXAMPLE_STATE_RUN		1
+
+struct gitt_example {
+	struct gitt g;
+	char *home;
+	char privkey[2048];
+	char repertory[64];
+	uint8_t buffer[4096];
+	int state;
+};
+
+typedef int (*cmd_func)(struct gitt_example *example, int args, char *argv[]);
+
+struct cmd_item {
+	char *name;
+	cmd_func func;
+	char *help;
+};
+
+static void gitt_replace(char src, char tag, char *buf, int buf_size)
 {
 	int i;
 
@@ -42,66 +66,289 @@ static void __replace(char src, char tag, char *buf, int buf_size)
 static void gitt_remote_event_callback(struct gitt *g, struct gitt_device *device,
 				       char *date, char *zone, char *event)
 {
+	char buf[128];
 	int len = strlen(event);
 
-	printf("%s | %s | %s | %s | ", device->name, device->id, date, zone);
+	sprintf(buf, "%s <%s> %s %s: ", device->name, device->id, date, zone);
+	printf("%-64s", buf);
 
-	__replace('\n', ' ', event, len);
+	gitt_replace('\n', ' ', event, len);
 	if (len < 32)
 		printf("%s\n", event);
 	else
 		printf("%.*s...\n", 32, event);
 }
 
-int main(int args, char *argv[])
+/* Get user home */
+static int get_home(struct gitt_example *example)
+{
+	uid_t uid = getuid();
+	struct passwd *pw = getpwuid(uid);
+
+	if (pw == NULL) {
+		fprintf(stderr, "Cannot get user information\n");
+		return -1;
+	}
+	printf("Home directory: %s\n", pw->pw_dir);
+	example->home = pw->pw_dir;
+
+	return 0;
+}
+
+static int print_warning(struct gitt_example *example)
+{
+	char buf[64] = {0};
+	int ret = -1;
+
+	printf("\n!! Warning: The following repertory will be formatted and all data will be lost.\n");
+	printf("Repertory: %s\n", example->repertory);
+	printf("Please confirm whether to continue? (no/yes): ");
+
+	if (scanf("%s", buf) == 1 && !strcmp(buf, "yes"))
+		ret = 0;
+
+	while (fread(buf, 1, 1, stdin) == 1 && buf[0] == '\0');
+
+	printf("\n");
+
+	return ret;
+}
+
+static void print_info(void)
+{
+	printf("GITT Version: %s\n", gitt_version());
+	printf("GITT License: MIT\n");
+	printf("Copyright (c) 2023 Hoozz <huxiangjs@foxmail.com>\n");
+}
+
+static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 {
 	int ret = 0;
-	char buffer[4096];
-	uint8_t *buf = (uint8_t *)malloc(0xffff);
 	FILE *file;
-	struct gitt g = {0};
+	char privkey_path[256];
+
+	/* A repertory url is required */
+	if (args < 2) {
+		fprintf(stderr, "Invalid: Please enter the repertory URL\n");
+		return -1;
+	}
+	if (strlen(argv[1]) + 1 > sizeof(example->repertory)) {
+		fprintf(stderr, "Invalid: Repertory URL too long\n");
+		return -1;
+	}
+	strcpy(example->repertory, argv[1]);
+	printf("Repertory URL: %s\n", argv[1]);
+
+	if (args >= 3) {
+		if (strlen(argv[2]) + 1 > sizeof(privkey_path)) {
+			fprintf(stderr, "Privkey path too long\n");
+			return -1;
+		}
+		strcpy(privkey_path, argv[2]);
+	} else {
+		sprintf(privkey_path, "%s/.ssh/%s", example->home, DEFAULT_PRIVKEY_PATH);
+	}
+	printf("Privkey path: %s\n", privkey_path);
 
 	/* Read key file */
-	file = fopen(PRIVKEY_PATH, "rb");
-	if (!file)
-		goto end;
-	ret = fread(buffer, 1, sizeof(buffer) - 1, file);
-	if (ret <= 0) {
-		fclose(file);
-		goto end;
+	file = fopen(privkey_path, "rb");
+	if (!file) {
+		fprintf(stderr, "Cannot open file: %s\n", privkey_path);
+		return -1;
 	}
-	buffer[ret] = '\0';
-	printf("%s\n", buffer);
+
+	ret = fread(example->privkey, 1, sizeof(example->privkey) - 1, file);
+	if (ret <= 0) {
+		fprintf(stderr, "File read fail\n");
+		fclose(file);
+		return -1;
+	}
+	example->privkey[ret] = '\0';
+	printf("Private key loading completed\n");
 	fclose(file);
 
-	g.privkey = buffer;
-	g.url = REPERTORY_URL;
-	g.buf = buf;
-	g.buf_len = 0xffff;
-	g.remote_event = gitt_remote_event_callback;
-	ret = gitt_init(&g);
+	ret = print_warning(example);
 	if (ret)
-		goto end;
-	printf("Init result: %s\n", GITT_ERRNO_STR(ret));
+		return ret;
+
+	/* Initialize */
+	example->g.privkey = example->privkey;
+	example->g.url = example->repertory;
+	example->g.buf = example->buffer;
+	example->g.buf_len = sizeof(example->buffer);
+	example->g.remote_event = gitt_remote_event_callback;
+	printf("Initialize...\n");
+	ret = gitt_init(&example->g);
+	printf("Initialize result: %s\n", GITT_ERRNO_STR(ret));
+	if (ret)
+		return ret;
+
+	printf("HEAD: %s\n", example->g.repertory.head_sha1);
 
 	/* Set device info */
-	strcpy(g.device.name, "TestDevice");
-	strcpy(g.device.id, "000000000000");
+	strcpy(example->g.device.name, EXAMPLE_DEVICE_NAME);
+	strcpy(example->g.device.id, EXAMPLE_DEVICE_ID);
+	printf("Device name: %s\n", example->g.device.name);
+	printf("Device id:   %s\n", example->g.device.id);
 
-	ret = gitt_history(&g);
-	if (ret)
-		goto end1;
+	example->state = EXAMPLE_STATE_RUN;
+
+	return 0;
+}
+
+static int cmd_func_history(struct gitt_example *example, int args, char *argv[])
+{
+	int ret;
+
+	if (example->state != EXAMPLE_STATE_RUN) {
+		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
+		return -1;
+	}
+
+	printf("Please wait...\n");
+	ret = gitt_history(&example->g);
 	printf("History result: %s\n", GITT_ERRNO_STR(ret));
-
-	ret = gitt_commit_event(&g, "Test event 2");
 	if (ret)
-		goto end1;
-	printf("Commit event result: %s\n", GITT_ERRNO_STR(ret));
+		return -1;
 
-end1:
-	gitt_end(&g);
-end:
-	printf("Test end. Result: %s\n", GITT_ERRNO_STR(ret));
-	free(buf);
+	return 0;
+}
+
+static int cmd_func_commit(struct gitt_example *example, int args, char *argv[])
+{
+	int ret;
+	char buff[1024];
+	int count;
+	int index;
+
+	if (example->state != EXAMPLE_STATE_RUN) {
+		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
+		return -1;
+	}
+
+	if (args < 2) {
+		fprintf(stderr, "Invalid: Please enter the event data\n");
+		return -1;
+	}
+
+	count = 0;
+	for (index = 1 ; index < args; index++)
+		count += sprintf(buff + count, "%s ", argv[index]);
+
+	printf("Please wait...\n");
+	ret = gitt_commit_event(&example->g, buff);
+	printf("Commit event result: %s\n", GITT_ERRNO_STR(ret));
+	if (ret)
+		return -1;
+
+	return 0;
+}
+
+static void print_help(void);
+
+static int cmd_func_help(struct gitt_example *example, int args, char *argv[])
+{
+	print_help();
+
+	return 0;
+}
+
+static int cmd_func_exit(struct gitt_example *example, int args, char *argv[])
+{
+	gitt_end(&example->g);
+	example->state = EXAMPLE_STATE_INIT;
+
+	return -2;
+}
+
+static struct cmd_item cmd_list[] = {
+	{"init",    cmd_func_init,    "init [repertory] <privkey>  -- Initialize GITT"},
+	{"exit",    cmd_func_exit,    "exit                        -- Exit GITT"},
+	{"history", cmd_func_history, "history                     -- View historical events"},
+	{"commit",  cmd_func_commit,  "commit [event]              -- Commit a event"},
+	{"help",    cmd_func_help,    "help                        -- Show help"},
+};
+
+static void print_help(void)
+{
+	int index;
+
+	printf("\nUsage:\n");
+	for (index = 0; index < sizeof(cmd_list)/sizeof(cmd_list[0]); index++)
+		printf("%8s:  %s\n", cmd_list[index].name, cmd_list[index].help);
+}
+
+static int read_parse_line(char *buf, int size, char *argv[])
+{
+	int index;
+	int ret;
+	char last = '\0';
+	int args;
+	int loop;
+
+	index = 0;
+	args = 0;
+	loop = 1;
+	while (loop && index < size && args < 10) {
+		ret = fread(buf + index, 1, 1, stdin);
+		if (ret <= 0 || buf[index] == '\n')
+			loop = 0;
+
+		if (buf[index] == ' ' || buf[index] == '\n')
+			buf[index] = '\0';
+
+		if (last == '\0' && buf[index] != '\0')
+			argv[args] = buf + index;
+		else if (last != '\0' && buf[index] == '\0')
+			args++;
+
+		if (buf[index] != '\0' || last != '\0') {
+			last = buf[index];
+			index++;
+		} else {
+			last = buf[index];
+		}
+	}
+
+	buf[index] = '\0';
+
+	return args;
+}
+
+int main(int args, char *argv[])
+{
+	struct gitt_example example = {0};
+	int ret;
+	char *arg_list[10];
+	char input[1024];
+	int index;
+
+	ret = get_home(&example);
+	if (ret)
+		return ret;
+
+	print_info();
+	print_help();
+
+	while (ret != -2) {
+		printf("GITT# ");
+		ret = read_parse_line(input, sizeof(input), arg_list);
+		if (!ret)
+			continue;
+
+		/* Exec */
+		for (index = 0; index < sizeof(cmd_list)/sizeof(cmd_list[0]); index++) {
+			if (!strcmp(arg_list[0], cmd_list[index].name)) {
+				ret = cmd_list[index].func(&example, ret, arg_list);
+				if (ret == -1)
+					print_help();
+				printf("\n");
+				break;
+			}
+		}
+	}
+
+	printf("Loop exit\n");
+
 	return 0;
 }
