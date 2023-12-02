@@ -36,12 +36,12 @@ static void gitt_obj_dump_callback(struct gitt_obj *obj)
 	struct gitt_unpack *unpack = gitt_containerof(obj, struct gitt_unpack, obj);
 	struct gitt_repertory *repertory = gitt_containerof(unpack, struct gitt_repertory, unpack);
 
-	gitt_log_debug("type:%s, size:%d\n", GITT_OBJ_STR(obj->type), obj->size);
-
 	if (obj->type == GITT_OBJ_TYPE_COMMIT && repertory->commit_dump) {
 		ret = gitt_commit_parse(obj->data, obj->size, &commit);
 		if (!ret)
 			repertory->commit_dump(&commit);
+	} else {
+		gitt_log_info("Skip type:%s, size:%d\n", GITT_OBJ_STR(obj->type), obj->size);
 	}
 }
 
