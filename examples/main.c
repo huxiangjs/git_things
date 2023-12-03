@@ -280,6 +280,7 @@ static int cmd_func_help(struct gitt_example *example, int args, char *argv[])
 	return 0;
 }
 
+/* Detect any key press */
 static int hit(void)
 {
 	struct termios oldt, newt;
@@ -345,6 +346,7 @@ static int cmd_func_exit(struct gitt_example *example, int args, char *argv[])
 	return -2;
 }
 
+/* Menu */
 static struct cmd_item cmd_list[] = {
 	{"init",    cmd_func_init,    "init [repertory] <privkey>  -- Initialize GITT"},
 	{"exit",    cmd_func_exit,    "exit                        -- Exit GITT"},
@@ -363,6 +365,7 @@ static void print_help(void)
 		printf("%8s:  %s\n", cmd_list[index].name, cmd_list[index].help);
 }
 
+/* Parse parameters in a line */
 static int read_parse_line(char *buf, int size, char *argv[])
 {
 	int index;
@@ -400,6 +403,7 @@ static int read_parse_line(char *buf, int size, char *argv[])
 	return args;
 }
 
+/* Enter */
 int main(int args, char *argv[])
 {
 	struct gitt_example example = {0};

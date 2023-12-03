@@ -106,6 +106,13 @@ static void gitt_repertory_commit_dump(struct gitt_repertory *repertory,
 	}
 }
 
+/**
+ * @brief Initialize GITT
+ *
+ * @param g struct gitt
+ * @return int     0: no error
+ * @return int other: error
+ */
 int gitt_init(struct gitt *g)
 {
 	int ret;
@@ -141,6 +148,13 @@ err0:
 	return ret;
 }
 
+/**
+ * @brief Refresh from remote repository
+ *
+ * @param g struct gitt
+ * @return int     0: no error
+ * @return int other: error
+ */
 int gitt_update_event(struct gitt *g)
 {
 	int ret;
@@ -159,6 +173,14 @@ int gitt_update_event(struct gitt *g)
 	return 0;
 }
 
+/**
+ * @brief Submit events to remote repository
+ *
+ * @param g struct gitt
+ * @param data event data
+ * @return int     0: no error
+ * @return int other: error
+ */
 int gitt_commit_event(struct gitt *g, char *data)
 {
 	int retval;
@@ -243,6 +265,13 @@ int gitt_commit_event(struct gitt *g, char *data)
 	return retval;
 }
 
+/**
+ * @brief Get all history in the repository
+ *
+ * @param g struct gitt
+ * @return int     0: no error
+ * @return int other: error
+ */
 int gitt_history(struct gitt *g)
 {
 	int ret;
@@ -259,6 +288,11 @@ int gitt_history(struct gitt *g)
 	return 0;
 }
 
+/**
+ * @brief Free GITT
+ *
+ * @param g struct gitt
+ */
 void gitt_end(struct gitt *g)
 {
 	gitt_repertory_end(&g->repertory);
@@ -272,6 +306,11 @@ void gitt_end(struct gitt *g)
 	g->buf_len = 0;
 }
 
+/**
+ * @brief Get the version of gitt
+ *
+ * @return char* version
+ */
 char *gitt_version(void)
 {
 	return GITT_VERSION;
