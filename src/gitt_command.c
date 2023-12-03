@@ -192,7 +192,7 @@ int gitt_command_get_head(struct gitt_ssh* ssh, char head[41], char refs[32])
 				return -GITT_ERRNO_INVAL;
 			refs[ret - 1] = '\0';
 			length -= ret;
-			gitt_log_info("Refs: %s\n", refs);
+			gitt_log_debug("Refs: %s\n", refs);
 		} else {
 			/* Debug output */
 			gitt_log_debug("%.*s", ret, buf);
@@ -428,14 +428,12 @@ int gitt_command_get_state(struct gitt_ssh* ssh)
 {
 	char buf[32];
 	int length;
+	int msg_len;
 	int ret;
-	bool new_line;
-	uint8_t line_count;
-	int retval = 0;
+	int retval = -GITT_ERRNO_RETRY;
+	char type;
 
-	line_count = 0;
 	while (1) {
-		new_line = true;
 		length = gitt_command_get_line_length(ssh);
 
 		if (length < 0)
@@ -444,32 +442,55 @@ int gitt_command_get_state(struct gitt_ssh* ssh)
 			break;
 		length -= 4;
 
+		/* Read line type */
+		ret = gitt_ssh_read(ssh, &type, 1);
+		if (ret != 1)
+			return -GITT_ERRNO_INVAL;
+		length -= 1;
+
 		while (length) {
-			ret = sizeof(buf);
-			ret = ret < length ? ret : length;
-			ret = gitt_ssh_read(ssh, buf, ret);
-			if (ret <= 0)
-				return -GITT_ERRNO_INVAL;
-			gitt_log_debug("%.*s", ret, buf);
+			if (type == 0x01) {
+				msg_len = gitt_command_get_line_length(ssh);
 
-			if (new_line) {
-				/* Remote return: 'ok' or 'ng' */
-				if (line_count == 2 && buf[0] == 0x01 && ret >= 7) {
-					if(buf[5] != 'o' || buf[6] != 'k') {
-						retval = -GITT_ERRNO_RETRY;
-						gitt_log_error("Remote said: Not good\n");
-					} else {
-						gitt_log_debug("Remote said: OK\n");
-					}
+				if (msg_len < 0) {
+					return -GITT_ERRNO_INVAL;
+				} else if(msg_len == 0) {
+					length -= 4;
+					continue;
+				} else if (msg_len < 6) {
+					return -GITT_ERRNO_INVAL;
 				}
+				length -= msg_len;
+				msg_len -= 4;
+
+				if (msg_len > sizeof(buf))
+					return -GITT_ERRNO_NOMEM;
+
+				ret = gitt_ssh_read(ssh, buf, msg_len);
+				if (ret != msg_len)
+					return -GITT_ERRNO_INVAL;
+				gitt_log_debug("%.*s", ret, buf);
+
+				/* Remote return: 'ok' or 'ng' */
+				if (retval && buf[0] == 'o' && buf[1] == 'k')
+					retval = 0;
+			} else {
+				ret = sizeof(buf);
+				ret = ret < length ? ret : length;
+				ret = gitt_ssh_read(ssh, buf, ret);
+				if (ret <= 0)
+					return -GITT_ERRNO_INVAL;
+				gitt_log_debug("%.*s", ret, buf);
+
+				length -= ret;
 			}
-
-			length -= ret;
-			new_line = false;
 		}
-
-		line_count++;
 	}
+
+	if (retval)
+		gitt_log_error("Remote said: Not good\n");
+	else
+		gitt_log_debug("Remote said: OK\n");
 
 	return retval;
 }
