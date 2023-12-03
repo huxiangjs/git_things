@@ -142,6 +142,10 @@ int gitt_repertory_push_commit(struct gitt_repertory *repertory, struct gitt_com
 		goto err0;
 	}
 
+	/* No base */
+	if (commit->parent.sha1 == GITT_COMMIT_NO_BASE)
+		commit->parent.sha1 = "";
+
 	/* Update commit id */
 	ret = gitt_commit_sha1_update(commit);
 	if (ret) {

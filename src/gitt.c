@@ -161,6 +161,7 @@ int gitt_update_event(struct gitt *g)
 
 int gitt_commit_event(struct gitt *g, char *data)
 {
+	int retval;
 	int ret;
 	int count;
 	struct gitt_commit commit = {0};
@@ -180,7 +181,14 @@ int gitt_commit_event(struct gitt *g, char *data)
 
 	/* Initialize commit */
 	commit.tree.sha1       = GITT_TREE_EMPTY_SHA1;
-	commit.parent.sha1     = GITT_COMMIT_AUTO_BASE;
+
+	/*
+	 * TODO:
+	 *   Here, change GITT_COMMIT_AUTO_BASE to GITT_COMMIT_NO_BASE.
+	 *   Please see the [1] item in the TODO file for the reason.
+	 */
+	// commit.parent.sha1     = GITT_COMMIT_AUTO_BASE;
+	commit.parent.sha1     = GITT_COMMIT_NO_BASE;
 
 	/* Fill date */
 	if (g->get_date && !g->get_date(date, sizeof(date))) {
@@ -216,10 +224,10 @@ int gitt_commit_event(struct gitt *g, char *data)
 	/* Try to commit */
 	count = 0;
 	do {
-		ret = gitt_repertory_push_commit(&g->repertory, &commit);
+		retval = gitt_repertory_push_commit(&g->repertory, &commit);
 		count++;
 
-		if (ret == -GITT_ERRNO_RETRY) {
+		if (retval == -GITT_ERRNO_RETRY) {
 			gitt_log_info("Retry count: %d\n", count);
 
 			/* Update */
@@ -227,12 +235,12 @@ int gitt_commit_event(struct gitt *g, char *data)
 			if (ret)
 				return ret;
 		} else {
-			gitt_log_debug("End code: %d\n", ret);
+			gitt_log_debug("End code: %d\n", retval);
 			break;
 		}
 	} while (count < GITT_TRY_NUMBER);
 
-	return ret;
+	return retval;
 }
 
 int gitt_history(struct gitt *g)

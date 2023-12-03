@@ -1,0 +1,8 @@
+GITT TODO
+=========
+
+[1]  Since when multiple commits are pulled from the same pack, some commit objects will be compressed into ofs_delta objects.
+     Currently, our protocol does not implement the parsing of ofs_delta objects, so the commits we obtain may be incomplete.
+     In order to solve this problem, the next best thing is to set the parent of the commit to empty. That is to say, we do
+     not keep the history record. Each new commit will always be the first commit in the repository.
+     Of course, this also has a side effect, that is, one repository can only be provided to one device.
