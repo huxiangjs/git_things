@@ -48,6 +48,9 @@ static void gitt_repertory_commit_dump(struct gitt_repertory *repertory,
 {
 	struct gitt *g = gitt_containerof(repertory, struct gitt, repertory);
 	struct gitt_device device;
+	char *p;
+	char *version;
+	char *flag;
 
 	/* Debug output */
 	gitt_log_debug("id.sha1        : %s\n", commit->id.sha1        );
@@ -64,6 +67,23 @@ static void gitt_repertory_commit_dump(struct gitt_repertory *repertory,
 	gitt_log_debug("message        : ");
 	gitt_log_debug("%s\n", commit->message);
 	gitt_log_debug("\n");
+
+	/* Split, These two parameters are reserved for future use */
+	p = commit->author.email;
+	version = "unknown";
+	flag = "unknown";
+	while (*p) {
+		if (*p == '@') {
+			*p = '\0';
+			version = p + 1;
+		} else if (*p == '.') {
+			*p = '\0';
+			flag = p + 1;
+		}
+
+		p++;
+	}
+	gitt_log_debug("GITT version:%s, flag:%s\n", version, flag);
 
 	/* Fill name */
 	if (strlen(commit->author.name) > GITT_DEVICE_NAME_SIZE - 1) {

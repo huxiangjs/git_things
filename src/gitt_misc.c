@@ -39,3 +39,7 @@ const char *gitt_errno_types[] = {
 	"Not enough memory",
 	"Please try again"
 };
+
+void gitt_null(const char *fmt, ...)
+{
+}

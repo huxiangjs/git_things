@@ -57,7 +57,8 @@ void gitt_log_err_impl(const char *fmt, ...);
 #if defined(DEBUG) || defined(_DEBUG)
 #define gitt_log_debug _gitt_log_out
 #else
-#define gitt_log_debug(...) do {} while (0)
+void gitt_null(const char *fmt, ...);
+#define gitt_log_debug(...) do {gitt_null(__VA_ARGS__);} while (0)
 #endif
 
 #define gitt_log_info _gitt_log_out
