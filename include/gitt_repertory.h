@@ -44,7 +44,8 @@ struct gitt_repertory {
 	struct gitt_pack pack;
 	char *url;
 	char *privkey;
-	char head_sha1[41];
+	char head[41];
+	char refs[32];
 	uint8_t *buf;
 	uint16_t buf_len;
 	gitt_repertory_commit commit_dump;

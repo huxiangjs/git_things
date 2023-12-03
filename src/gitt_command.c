@@ -118,27 +118,28 @@ int gitt_command_say_byebye(struct gitt_ssh* ssh)
 	return 0;
 }
 
-int gitt_command_get_head(struct gitt_ssh* ssh, char sha1_hex[41])
+int gitt_command_get_head(struct gitt_ssh* ssh, char head[41], char refs[32])
 {
 	int ret;
 	int length;
 	int index;
-	char buf[32];
+	char buf[40];
 
 	length = gitt_command_get_line_length(ssh);
 	gitt_log_debug("First line length: %dbyte\n", length);
 	if (length < 4 + 40)
 		return -GITT_ERRNO_INVAL;
+	length -= 4;
 
 	/* Read SHA-1 */
-	ret = gitt_ssh_read(ssh, sha1_hex, 40);
+	ret = gitt_ssh_read(ssh, head, 40);
 	if (ret != 40)
 		return -GITT_ERRNO_INVAL;
-	sha1_hex[40] = '\0';
-	gitt_log_debug("HEAD: %s\n", sha1_hex);
+	head[40] = '\0';
+	length -= 40;
+	gitt_log_debug("HEAD: %s\n", head);
 
 	/* We don't care about the rest of the data */
-	length -= 40 + 4;
 	while (length) {
 		ret = sizeof(buf);
 		ret = ret < length ? ret : length;
@@ -157,26 +158,56 @@ int gitt_command_get_head(struct gitt_ssh* ssh, char sha1_hex[41])
 		length -= ret;
 	}
 
+	refs[0] = '\0';
 	while (1) {
 		length = gitt_command_get_line_length(ssh);
 		gitt_log_debug("Line length: %dbyte\n", length);
 
-		if (length < 0)
-			return -GITT_ERRNO_INVAL;
-		else if (length == 0)
+		if (length == 0)
 			break;
+		else if (length < 4 + 40 + 1 + 1)
+			return -GITT_ERRNO_INVAL;
 		length -= 4;
 
-		while (length) {
-			ret = sizeof(buf);
-			ret = ret < length ? ret : length;
-			ret = gitt_ssh_read(ssh, buf, ret);
-			if (ret <= 0)
-				return -GITT_ERRNO_INVAL;
-
-			gitt_log_debug("%.*s", ret, buf);
-
+		/* Find refs */
+		ret = gitt_ssh_read(ssh, buf, 40);
+		if (ret <= 0) {
+			return -GITT_ERRNO_INVAL;
+		} else if (ret == 40 && !refs[0] && !memcmp(buf, head, 40)) {
 			length -= ret;
+
+			/* Skip a space */
+			ret = gitt_ssh_read(ssh, buf, 1);
+			if (ret != 1)
+				return -GITT_ERRNO_INVAL;
+			length -= ret;
+
+			if (length > 31 || length < 2) {
+				gitt_log_error("Head name too long or too short\n");
+				return -GITT_ERRNO_INVAL;
+			}
+
+			ret = gitt_ssh_read(ssh, refs, length);
+			if (ret != length)
+				return -GITT_ERRNO_INVAL;
+			refs[ret - 1] = '\0';
+			length -= ret;
+			gitt_log_info("Refs: %s\n", refs);
+		} else {
+			/* Debug output */
+			gitt_log_debug("%.*s", ret, buf);
+			length -= ret;
+			while (length) {
+				ret = sizeof(buf);
+				ret = ret < length ? ret : length;
+				ret = gitt_ssh_read(ssh, buf, ret);
+				if (ret <= 0)
+					return -GITT_ERRNO_INVAL;
+
+				gitt_log_debug("%.*s", ret, buf);
+
+				length -= ret;
+			}
 		}
 	}
 

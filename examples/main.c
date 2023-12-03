@@ -210,7 +210,8 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 	if (ret)
 		return ret;
 
-	printf("HEAD: %s\n", example->g.repertory.head_sha1);
+	printf("HEAD: %s\n", example->g.repertory.head);
+	printf("Refs: %s\n", example->g.repertory.refs);
 
 	/* Set device info */
 	strcpy(example->g.device.name, EXAMPLE_DEVICE_NAME);

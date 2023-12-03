@@ -36,7 +36,7 @@ typedef int (*gitt_command_pack_dump)(void *param, char *data, int size);
 
 struct gitt_ssh* gitt_command_start_receive(const char *url, const char *privkey);
 struct gitt_ssh* gitt_command_start_upload(const char *url, const char *privkey);
-int gitt_command_get_head(struct gitt_ssh* ssh, char sha1_hex[41]);
+int gitt_command_get_head(struct gitt_ssh* ssh, char head[41], char refs[32]);
 void gitt_command_end(struct gitt_ssh* ssh);
 int gitt_command_say_byebye(struct gitt_ssh* ssh);
 int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[41]);
