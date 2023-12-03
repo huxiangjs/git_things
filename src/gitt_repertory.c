@@ -136,15 +136,12 @@ int gitt_repertory_push_commit(struct gitt_repertory *repertory, struct gitt_com
 		commit->parent.sha1 = remote_head;
 
 	/* Check parent */
-	if (commit->parent.sha1 && strcmp(commit->parent.sha1, remote_head)) {
+	if (commit->parent.sha1 && strlen(commit->parent.sha1) &&
+	    strcmp(commit->parent.sha1, remote_head)) {
 		ret = -GITT_ERRNO_RETRY;
 		gitt_log_debug("The current local record is not up to date\n");
 		goto err0;
 	}
-
-	/* No base */
-	if (commit->parent.sha1 == GITT_COMMIT_NO_BASE)
-		commit->parent.sha1 = "";
 
 	/* Update commit id */
 	ret = gitt_commit_sha1_update(commit);
