@@ -31,6 +31,7 @@
 #include <malloc.h>
 #include <gitt.h>
 #include <gitt_errno.h>
+#include <time.h>
 
 #define DEFAULT_PRIVKEY_PATH		"id_ed25519"
 
@@ -148,6 +149,37 @@ static void print_info(void)
 	printf("GITT Version: %s\n", gitt_version());
 }
 
+static int gitt_get_date_impl(char *buf, uint8_t size)
+{
+	time_t cur_time;
+
+	cur_time = time(NULL);
+	if (cur_time == -1)
+		return cur_time;
+
+	sprintf(buf, "%ld", cur_time);
+
+	return 0;
+}
+
+static int gitt_get_zone_impl(char *buf, uint8_t size)
+{
+	int h, m;
+	char d;
+	long zone;
+
+	tzset();
+
+	zone = timezone / -60;
+	d = zone < 0 ? '-' : '+';
+	h = zone / 60;
+	m = zone % 60;
+
+	sprintf(buf, "%c%02d%02d", d, h, m);
+
+	return 0;
+}
+
 static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 {
 	int ret = 0;
@@ -204,6 +236,11 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 	example->g.buf = example->buffer;
 	example->g.buf_len = sizeof(example->buffer);
 	example->g.remote_event = gitt_remote_event_callback;
+
+	/* These two functions are optional, you can choose not to implement them */
+	example->g.get_date = gitt_get_date_impl;
+	example->g.get_zone = gitt_get_zone_impl;
+
 	printf("Initialize...\n");
 	ret = gitt_init(&example->g);
 	printf("Initialize result: %s\n", GITT_ERRNO_STR(ret));
