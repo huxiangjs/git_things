@@ -23,7 +23,6 @@
  */
 
 #include <string.h>
-#include <zlib.h>
 #include <gitt_unpack.h>
 #include <gitt_log.h>
 #include <gitt_errno.h>
@@ -200,7 +199,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 			/* Check whether decompression has been completed */
 			if (in_size == 0 && unpack->obj.size == unpack->valid_len) {
 				gitt_log_debug("Decompress has been completed\n");
-				gitt_zlib_compress_end(&unpack->zlib);
+				gitt_zlib_decompress_end(&unpack->zlib);
 				/* Anyway, we add the terminator to it */
 				unpack->buf[unpack->obj.size] = '\0';
 				unpack->obj.data = (char *)unpack->buf;
@@ -225,7 +224,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 	return index;
 
 fail:
-	gitt_zlib_compress_end(&unpack->zlib);
+	gitt_zlib_decompress_end(&unpack->zlib);
 	unpack->pack_state = GITT_UNPACK_STATE_STOP;
 	return -GITT_ERRNO_INVAL;
 }
@@ -347,7 +346,7 @@ void gitt_unpack_end(struct gitt_unpack *unpack)
 
 	if (unpack->obj_state != GITT_UNPACK_STATE_INIT) {
 		unpack->obj_state = GITT_UNPACK_STATE_INIT;
-		gitt_zlib_compress_end(&unpack->zlib);
+		gitt_zlib_decompress_end(&unpack->zlib);
 	}
 
 	unpack->pack_state = GITT_UNPACK_STATE_STOP;
