@@ -347,6 +347,7 @@ static int cmd_func_loop(struct gitt_example *example, int args, char *argv[])
 {
 	int interval = DEFAULT_LOOP_TIME;
 	int ret;
+	int count = 0;
 
 	if (example->state != EXAMPLE_STATE_RUN) {
 		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
@@ -360,15 +361,21 @@ static int cmd_func_loop(struct gitt_example *example, int args, char *argv[])
 	printf("Entering the loop, you can press any key to end it\n");
 
 	while (1) {
-		ret = gitt_update_event(&example->g);
-		// printf("Update event result: %s\n", GITT_ERRNO_STR(ret));
-		if (ret)
-			break;
+		if (!count) {
+			ret = gitt_update_event(&example->g);
+			// printf("Update event result: %s\n", GITT_ERRNO_STR(ret));
+			if (ret)
+				break;
+		}
 
 		if (hit())
 			break;
 
-		sleep(interval);
+		sleep(1);
+		count++;
+
+		if (count >= interval)
+			count = 0;
 	}
 
 	printf("\nExit loop\n");
