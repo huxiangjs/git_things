@@ -312,7 +312,7 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 	int length;
 	int ret;
 	bool new_line;
-	uint8_t type;
+	uint8_t type = 0xff;
 	char *pbuf;
 	int valid;
 
