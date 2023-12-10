@@ -57,7 +57,7 @@ int gitt_ssh_connect_impl(struct gitt_ssh *ssh, struct gitt_ssh_url *ssh_url,
 	ssh_options_set(ssh->session, SSH_OPTIONS_USER, ssh_url->user);
 	ssh_options_set(ssh->session, SSH_OPTIONS_HOST, ssh_url->host);
 	ssh_options_set(ssh->session, SSH_OPTIONS_PORT_STR, ssh_url->port);
-	// ssh_options_set(session, SSH_OPTIONS_LOG_VERBOSITY_STR, "3");
+	// ssh_options_set(ssh->session, SSH_OPTIONS_LOG_VERBOSITY_STR, "3");
 
 	/* Connect to server */
 	err = ssh_connect(ssh->session);

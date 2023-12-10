@@ -498,4 +498,5 @@ int gitt_command_get_state(struct gitt_ssh* ssh)
 void gitt_command_end(struct gitt_ssh* ssh)
 {
 	gitt_ssh_disconnect(ssh);
+	gitt_ssh_free(ssh);
 }
