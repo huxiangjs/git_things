@@ -29,14 +29,14 @@
 extern "C" {
 #endif /* __cplusplus */
 
-extern const char *gitt_errno_types[];
+const char *gitt_errno_str(int errno);
 
 #define GITT_ERRNO_OK			0
 #define GITT_ERRNO_INVAL		1
 #define GITT_ERRNO_NOMEM		2
 #define GITT_ERRNO_RETRY		3
 
-#define GITT_ERRNO_STR(no)	gitt_errno_types[-no]
+#define GITT_ERRNO_STR(no)	gitt_errno_str(no)
 
 #ifdef __cplusplus
 }

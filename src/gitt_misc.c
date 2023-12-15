@@ -33,7 +33,9 @@ const char *gitt_obj_types[] = {
 	"ref_delta"
 };
 
-const char *gitt_errno_types[] = {
+#define ERRNO_STR_MAX		4
+
+const char *gitt_errno_types[ERRNO_STR_MAX] = {
 	"Successful",
 	"Invalid parameter",
 	"Not enough memory",
@@ -43,3 +45,12 @@ const char *gitt_errno_types[] = {
 void gitt_null(const char *fmt, ...)
 {
 }
+
+const char *gitt_errno_str(int errno)
+{
+	if (-errno >= 0 && -errno < ERRNO_STR_MAX)
+		return gitt_errno_types[-errno];
+
+	return "Unknown error";
+}
+
