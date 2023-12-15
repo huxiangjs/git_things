@@ -183,7 +183,7 @@ int gitt_repertory_push_commit(struct gitt_repertory *repertory, struct gitt_com
 	gitt_command_end(repertory->ssh);
 
 	/* Update head */
-	memcpy(repertory->head, remote_head, sizeof(remote_head));
+	memcpy(repertory->head, commit->id.sha1, sizeof(commit->id.sha1));
 	if (strlen(refs))
 		strcpy(repertory->refs, refs);
 	gitt_log_debug("Head updated: %s\n", repertory->head);
