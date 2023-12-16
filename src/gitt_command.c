@@ -429,6 +429,7 @@ int gitt_command_get_state(struct gitt_ssh* ssh)
 	char buf[32];
 	int length;
 	int msg_len;
+	int read_len;
 	int ret;
 	int retval = -GITT_ERRNO_RETRY;
 	char type;
@@ -462,18 +463,34 @@ int gitt_command_get_state(struct gitt_ssh* ssh)
 				}
 				length -= msg_len;
 				msg_len -= 4;
+				buf[0] = '\0';
+				buf[1] = '\0';
 
-				if (msg_len > sizeof(buf))
-					return -GITT_ERRNO_NOMEM;
-
-				ret = gitt_ssh_read(ssh, buf, msg_len);
-				if (ret != msg_len)
+				read_len = msg_len > sizeof(buf) ? sizeof(buf) : msg_len;
+				ret = gitt_ssh_read(ssh, buf, read_len);
+				if (ret != read_len) {
+					gitt_log_error("Data is incomplete, ret:%d\n", ret);
 					return -GITT_ERRNO_INVAL;
+				}
 				gitt_log_debug("%.*s", ret, buf);
+				msg_len -= ret;
 
 				/* Remote return: 'ok' or 'ng' */
 				if (retval && buf[0] == 'o' && buf[1] == 'k')
 					retval = 0;
+
+				/* Read the remaining data */
+				read_len = msg_len > sizeof(buf) ? sizeof(buf) : msg_len;
+				while (read_len) {
+					ret = gitt_ssh_read(ssh, buf, read_len);
+					if (ret != read_len) {
+						gitt_log_error("Remaining data is incomplete, ret:%d\n", ret);
+						return -GITT_ERRNO_INVAL;
+					}
+					gitt_log_debug("%.*s", ret, buf);
+					msg_len -= ret;
+					read_len = msg_len > sizeof(buf) ? sizeof(buf) : msg_len;
+				}
 			} else {
 				ret = sizeof(buf);
 				ret = ret < length ? ret : length;
