@@ -48,7 +48,6 @@ int gitt_ssh_connect_impl(struct gitt_ssh *ssh, struct gitt_ssh_url *ssh_url,
 			  const char *exec, const char *privkey)
 {
 	int err;
-	char buffer[96];
 
 	/* Open session and set options */
 	ssh->session = ssh_new();
@@ -88,8 +87,7 @@ int gitt_ssh_connect_impl(struct gitt_ssh *ssh, struct gitt_ssh_url *ssh_url,
 	/* Open channel */
 	ssh->channel = ssh_channel_new(ssh->session);
 	ssh_channel_open_session(ssh->channel);
-	snprintf(buffer, sizeof(buffer), "%s '%s'", exec, ssh_url->repository);
-	ssh_channel_request_exec(ssh->channel, buffer);
+	ssh_channel_request_exec(ssh->channel, exec);
 
 	return 0;
 

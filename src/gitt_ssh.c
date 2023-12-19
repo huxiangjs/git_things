@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+#include <stdio.h>
 #include <string.h>
 #include <gitt_log.h>
 #include <gitt_ssh.h>
@@ -110,6 +111,7 @@ int gitt_ssh_connect(struct gitt_ssh *ssh, const char *url, const char *exec,
 {
 	struct gitt_ssh_url ssh_url;
 	int err;
+	char buffer[96];
 
 	if (!ssh || !url || !exec || !privkey)
 		return -GITT_ERRNO_INVAL;
@@ -122,7 +124,9 @@ int gitt_ssh_connect(struct gitt_ssh *ssh, const char *url, const char *exec,
 	gitt_log_debug("Port: %s\n", ssh_url.port);
 	gitt_log_debug("Repository: %s\n", ssh_url.repository);
 
-	return gitt_ssh_connect_impl(ssh, &ssh_url, exec, privkey);
+	snprintf(buffer, sizeof(buffer), "%s '%s'", exec, ssh_url.repository);
+
+	return gitt_ssh_connect_impl(ssh, &ssh_url, buffer, privkey);
 }
 
 int gitt_ssh_read(struct gitt_ssh *ssh, char *buf, int size)
