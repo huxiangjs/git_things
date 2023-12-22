@@ -22,8 +22,8 @@
  * SOFTWARE.
  */
 
-#ifndef __GITT_REPERTORY_H_
-#define __GITT_REPERTORY_H_
+#ifndef __GITT_REPOSITORY_H_
+#define __GITT_REPOSITORY_H_
 
 #include <gitt_unpack.h>
 #include <gitt_commit.h>
@@ -34,12 +34,12 @@
 extern "C" {
 #endif /* __cplusplus */
 
-struct gitt_repertory;
+struct gitt_repository;
 
-typedef void (*gitt_repertory_commit)(struct gitt_repertory *repertory,
+typedef void (*gitt_repository_commit)(struct gitt_repository *repository,
 				      struct gitt_commit *commit);
 
-struct gitt_repertory {
+struct gitt_repository {
 	struct gitt_unpack unpack;
 	struct gitt_pack pack;
 	char *url;
@@ -48,20 +48,20 @@ struct gitt_repertory {
 	char refs[32];
 	uint8_t *buf;
 	uint16_t buf_len;
-	gitt_repertory_commit commit_dump;
+	gitt_repository_commit commit_dump;
 	struct gitt_ssh* ssh;
 };
 
-int gitt_repertory_init(struct gitt_repertory *repertory);
-int gitt_repertory_clone(struct gitt_repertory *repertory);
-int gitt_repertory_push_commit(struct gitt_repertory *repertory,
+int gitt_repository_init(struct gitt_repository *repository);
+int gitt_repository_clone(struct gitt_repository *repository);
+int gitt_repository_push_commit(struct gitt_repository *repository,
 			       struct gitt_commit *commit);
-int gitt_repertory_pull(struct gitt_repertory *repertory);
-int gitt_repertory_update_head(struct gitt_repertory *repertory);
-int gitt_repertory_end(struct gitt_repertory *repertory);
+int gitt_repository_pull(struct gitt_repository *repository);
+int gitt_repository_update_head(struct gitt_repository *repository);
+int gitt_repository_end(struct gitt_repository *repository);
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
-#endif /* __GITT_REPERTORY_H_ */
+#endif /* __GITT_REPOSITORY_H_ */

@@ -47,7 +47,7 @@ struct gitt_example {
 	struct gitt g;
 	char *home;
 	char privkey[2048];
-	char repertory[64];
+	char repository[64];
 	uint8_t buffer[4096];
 	int state;
 };
@@ -105,8 +105,8 @@ static int print_warning(struct gitt_example *example)
 	char buf[64] = {0};
 	int ret = -1;
 
-	printf("\n!! Warning: The following repertory will be formatted and all data will be lost.\n");
-	printf("Repertory: %s\n", example->repertory);
+	printf("\n!! Warning: The following repository will be formatted and all data will be lost.\n");
+	printf("Repository: %s\n", example->repository);
 	printf("Please confirm whether to continue? (no/yes): ");
 
 	if (scanf("%s", buf) == 1 && !strcmp(buf, "yes"))
@@ -186,17 +186,17 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 	FILE *file;
 	char privkey_path[256];
 
-	/* A repertory url is required */
+	/* A repository url is required */
 	if (args < 2) {
-		fprintf(stderr, "Invalid: Please enter the repertory URL\n");
+		fprintf(stderr, "Invalid: Please enter the repository URL\n");
 		return -1;
 	}
-	if (strlen(argv[1]) + 1 > sizeof(example->repertory)) {
-		fprintf(stderr, "Invalid: Repertory URL too long\n");
+	if (strlen(argv[1]) + 1 > sizeof(example->repository)) {
+		fprintf(stderr, "Invalid: Repository URL too long\n");
 		return -1;
 	}
-	strcpy(example->repertory, argv[1]);
-	printf("Repertory URL: %s\n", argv[1]);
+	strcpy(example->repository, argv[1]);
+	printf("Repository URL: %s\n", argv[1]);
 
 	if (args >= 3) {
 		if (strlen(argv[2]) + 1 > sizeof(privkey_path)) {
@@ -232,7 +232,7 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 
 	/* Initialize */
 	example->g.privkey = example->privkey;
-	example->g.url = example->repertory;
+	example->g.url = example->repository;
 	example->g.buf = example->buffer;
 	example->g.buf_len = sizeof(example->buffer);
 	example->g.remote_event = gitt_remote_event_callback;
@@ -247,8 +247,8 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 	if (ret)
 		return ret;
 
-	printf("HEAD: %s\n", example->g.repertory.head);
-	printf("Refs: %s\n", example->g.repertory.refs);
+	printf("HEAD: %s\n", example->g.repository.head);
+	printf("Refs: %s\n", example->g.repository.refs);
 
 	/* Set device info */
 	strcpy(example->g.device.name, EXAMPLE_DEVICE_NAME);
@@ -393,12 +393,12 @@ static int cmd_func_exit(struct gitt_example *example, int args, char *argv[])
 
 /* Menu */
 static struct cmd_item cmd_list[] = {
-	{"init",    cmd_func_init,    "init [repertory] <privkey>  -- Initialize GITT"},
-	{"exit",    cmd_func_exit,    "exit                        -- Exit GITT"},
-	{"history", cmd_func_history, "history                     -- View historical events"},
-	{"commit",  cmd_func_commit,  "commit [event]              -- Commit a event"},
-	{"loop",    cmd_func_loop,    "loop <time>                 -- Loop to get events"},
-	{"help",    cmd_func_help,    "help                        -- Show help"},
+	{"init",    cmd_func_init,    "init [repository] <privkey>  -- Initialize GITT"},
+	{"exit",    cmd_func_exit,    "exit                         -- Exit GITT"},
+	{"history", cmd_func_history, "history                      -- View historical events"},
+	{"commit",  cmd_func_commit,  "commit [event]               -- Commit a event"},
+	{"loop",    cmd_func_loop,    "loop <time>                  -- Loop to get events"},
+	{"help",    cmd_func_help,    "help                         -- Show help"},
 };
 
 static void print_help(void)

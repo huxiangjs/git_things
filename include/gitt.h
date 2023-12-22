@@ -25,7 +25,7 @@
 #ifndef __GITT_H_
 #define __GITT_H_
 
-#include <gitt_repertory.h>
+#include <gitt_repository.h>
 #include <gitt_device.h>
 
 #ifdef __cplusplus
@@ -43,7 +43,7 @@ typedef void (*gitt_remote_event)(struct gitt *g, struct gitt_device *device,
 
 struct gitt {
 	struct gitt_device device;
-	struct gitt_repertory repertory;
+	struct gitt_repository repository;
 	gitt_get_date get_date;
 	gitt_get_zone get_zone;
 	gitt_remote_event remote_event;

@@ -43,10 +43,10 @@
 
 #define GITT_TRY_NUMBER			5
 
-static void gitt_repertory_commit_dump(struct gitt_repertory *repertory,
-				       struct gitt_commit *commit)
+static void gitt_repository_commit_dump(struct gitt_repository *repository,
+					struct gitt_commit *commit)
 {
-	struct gitt *g = gitt_containerof(repertory, struct gitt, repertory);
+	struct gitt *g = gitt_containerof(repository, struct gitt, repository);
 	struct gitt_device device;
 	char *p;
 	char *version;
@@ -122,19 +122,19 @@ int gitt_init(struct gitt *g)
 		return -GITT_ERRNO_INVAL;
 	}
 
-	g->repertory.privkey = g->privkey;
-	g->repertory.url = g->url;
-	g->repertory.buf = g->buf;
-	g->repertory.buf_len = g->buf_len;
-	g->repertory.commit_dump = gitt_repertory_commit_dump;
+	g->repository.privkey = g->privkey;
+	g->repository.url = g->url;
+	g->repository.buf = g->buf;
+	g->repository.buf_len = g->buf_len;
+	g->repository.commit_dump = gitt_repository_commit_dump;
 
-	ret = gitt_repertory_init(&g->repertory);
+	ret = gitt_repository_init(&g->repository);
 	if (ret) {
-		gitt_log_error("Initializing the repertory fail\n");
+		gitt_log_error("Initializing the repository fail\n");
 		goto err0;
 	}
 
-	ret = gitt_repertory_update_head(&g->repertory);
+	ret = gitt_repository_update_head(&g->repository);
 	if (ret) {
 		gitt_log_error("Update head fail\n");
 		goto err1;
@@ -143,7 +143,7 @@ int gitt_init(struct gitt *g)
 	return 0;
 
 err1:
-	gitt_repertory_end(&g->repertory);
+	gitt_repository_end(&g->repository);
 err0:
 	return ret;
 }
@@ -164,9 +164,9 @@ int gitt_update_event(struct gitt *g)
 		return -GITT_ERRNO_INVAL;
 	}
 
-	ret = gitt_repertory_pull(&g->repertory);
+	ret = gitt_repository_pull(&g->repository);
 	if (ret) {
-		gitt_log_error("Pull the repertory fail\n");
+		gitt_log_error("Pull the repository fail\n");
 		return ret;
 	}
 
@@ -246,7 +246,7 @@ int gitt_commit_event(struct gitt *g, char *data)
 	/* Try to commit */
 	count = 0;
 	do {
-		retval = gitt_repertory_push_commit(&g->repertory, &commit);
+		retval = gitt_repository_push_commit(&g->repository, &commit);
 		count++;
 
 		if (retval == -GITT_ERRNO_RETRY) {
@@ -281,7 +281,7 @@ int gitt_history(struct gitt *g)
 		return -GITT_ERRNO_INVAL;
 	}
 
-	ret = gitt_repertory_clone(&g->repertory);
+	ret = gitt_repository_clone(&g->repository);
 	if (ret)
 		return ret;
 
@@ -295,7 +295,7 @@ int gitt_history(struct gitt *g)
  */
 void gitt_end(struct gitt *g)
 {
-	gitt_repertory_end(&g->repertory);
+	gitt_repository_end(&g->repository);
 
 	g->get_date = NULL;
 	g->get_zone = NULL;

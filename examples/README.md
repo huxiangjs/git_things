@@ -51,19 +51,19 @@
      Home directory: /home/huxiang
      ...... (Log is omitted here)
      Usage:
-         init:  init [repertory] <privkey>  -- Initialize GITT
+         init:  init [repository] <privkey>  -- Initialize GITT
          exit:  exit                        -- Exit GITT
       history:  history                     -- View historical events
        commit:  commit [event]              -- Commit a event
          loop:  loop <time>                 -- Loop to get events
          help:  help                        -- Show help
      GITT# init git@github.com:huxiangjs/gitt_example.git
-     Repertory URL: git@github.com:huxiangjs/gitt_example.git
+     Repository URL: git@github.com:huxiangjs/gitt_example.git
      Privkey path: /home/huxiang/.ssh/id_ed25519
      Private key loading completed
 
-     !! Warning: The following repertory will be formatted and all data will    be   lost.
-     Repertory: git@github.com:huxiangjs/gitt_example.git
+     !! Warning: The following repository will be formatted and all data will    be   lost.
+     Repository: git@github.com:huxiangjs/gitt_example.git
      Please confirm whether to continue? (no/yes): yes
 
      Initialize...
@@ -84,19 +84,19 @@
      Home directory: /home/huxiang
      ...... (Log is omitted here)
      Usage:
-         init:  init [repertory] <privkey>  -- Initialize GITT
+         init:  init [repository] <privkey>  -- Initialize GITT
          exit:  exit                        -- Exit GITT
       history:  history                     -- View historical events
        commit:  commit [event]              -- Commit a event
          loop:  loop <time>                 -- Loop to get events
          help:  help                        -- Show help
      GITT# init git@github.com:huxiangjs/gitt_example.git
-     Repertory URL: git@github.com:huxiangjs/gitt_example.git
+     Repository URL: git@github.com:huxiangjs/gitt_example.git
      Privkey path: /home/huxiang/.ssh/id_ed25519
      Private key loading completed
 
-     !! Warning: The following repertory will be formatted and all data will be      lost.
-     Repertory: git@github.com:huxiangjs/gitt_example.git
+     !! Warning: The following repository will be formatted and all data will be      lost.
+     Repository: git@github.com:huxiangjs/gitt_example.git
      Please confirm whether to continue? (no/yes): yes
 
      Initialize...
