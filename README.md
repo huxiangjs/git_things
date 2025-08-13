@@ -6,6 +6,9 @@ So let's forget about other servers and let's have fun!
 
 :)
 
+[![Linux CI](https://github.com/huxiangjs/git_things/actions/workflows/linux.yml/badge.svg)](https://github.com/huxiangjs/git_things/actions/workflows/linux.yml)
+
+
 ## :rocket: Advantages
 * Implemented in pure C language, portable across platforms.
 * Very few third-party dependencies. (Currently only relying on zlib)
