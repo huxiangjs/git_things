@@ -1,0 +1,33 @@
+name: Linux CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: true
+        default: 'master'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # Checkout the repository to the GitHub Actions runner
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    # Install libssh
+    - name: Install libssh
+      run: sudo apt-get install libssh-dev
+
+    # Run Linux build command
+    - name: Build
+      run: |
+        cd examples/
+        make
