@@ -1,5 +1,7 @@
 # :fire: Git Things
 
+**🔴 NOTICE: This branch only serves the [hoozz_play_esp32c3_remote_switch](https://github.com/huxiangjs/hoozz_play_esp32c3_remote_switch) project, and is no longer maintained or under development.**
+
 [English](README.md) | [简体中文](README_zh.md)
 
 Git Things is a library implemented in pure C, referred to as GITT below. It was originally developed to enable serverless IoT device connectivity. It can convert instructions from the operator into git commits, and the device side then pulls the repository to perform control operations. Using this library, you will no longer have to spend time and money maintaining your own cloud server. We can directly use GitHub as our data exchange server.
@@ -7,9 +9,6 @@ Git Things is a library implemented in pure C, referred to as GITT below. It was
 So let's forget about other servers and let's have fun!
 
 :)
-
-[![Linux CI](https://github.com/huxiangjs/git_things/actions/workflows/linux.yml/badge.svg)](https://github.com/huxiangjs/git_things/actions/workflows/linux.yml)
-
 
 ## :rocket: Advantages
 * Implemented in pure C, portable across platforms.

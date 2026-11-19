@@ -1,5 +1,7 @@
 # :fire: Git Things
 
+**🔴 注意：此分支仅仅服务于 [hoozz_play_esp32c3_remote_switch](https://github.com/huxiangjs/hoozz_play_esp32c3_remote_switch) 项目，目前已不再维护和继续开发。**
+
 [English](README.md) | [简体中文](README_zh.md)
 
 Git Things 是一个用纯 C 语言实现的库，下文简称为 GITT。它最初是为了实现无云服务的 IoT 设备连接而开发的。它可以将操作端发出的指令转换为 git commit，然后设备端拉取仓库来执行控制操作。使用本库后，你不再需要花费时间和金钱去维护自己的云服务器，可以直接使用 GitHub 作为数据交换服务器。
@@ -7,9 +9,6 @@ Git Things 是一个用纯 C 语言实现的库，下文简称为 GITT。它最�
 那么，忘掉其他服务器，来享受乐趣吧！
 
 :)
-
-[![Linux CI](https://github.com/huxiangjs/git_things/actions/workflows/linux.yml/badge.svg)](https://github.com/huxiangjs/git_things/actions/workflows/linux.yml)
-
 
 ## :rocket: 优点
 * 纯 C 语言实现，可移植到各平台。
