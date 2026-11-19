@@ -1,4 +1,6 @@
-# Example of running on linux
+# Running on Linux
+
+[English](README.md) | [简体中文](README_zh.md)
 
 ## Basic environment
 * OS:
@@ -20,17 +22,17 @@
   ```
 
 ## Steps
-* Create repository (Take GitHub as an example)
-  1. Enter [GitHub](https://github.com)
-  2. Login to your account and click "New Repository"
-  3. "Repository name" sets the name you want, here we fill in "gitt_example"
-  4. The repository type is set to "Private". (unless you want to make it public)
-  5. "Choose a license" fill in the MIT License. (You can fill it in whatever you want, just make sure the repository is initialized correctly, this is very important)
-  6. Finally, click "Create repository". At this time you will get an initialized repository. The URL of our repository here is: `git@github.com:huxiangjs/gitt_example.git`
+* Create a repository (using GitHub as an example)
+  1. Go to [GitHub](https://github.com)
+  2. Log in to your account and click "New repository"
+  3. For "Repository name", set the name you want; here we use "gitt_example"
+  4. Set the repository type to "Private" (unless you want to make it public)
+  5. For "Choose a license", select the MIT License. (You can choose whatever you like, but make sure the repository is initialized correctly—this is very important)
+  6. Finally, click "Create repository". You now have an initialized repository. The URL of our repository here is: `git@github.com:huxiangjs/gitt_example.git`
 
-* Add the public key to your GitHub (skip if you have already added it)
-  1. Enter the following command on your host: `ssh-keygen -t ed25519 -C "your_email@example.com"`. After the operation is completed, your public key will be generated in `/home/you/.ssh/id_ed25519.pub`
-  2. Enter GitHub setting, Click "SSH and GPG keys", then click "New SSH key" and add your public key
+* Add your public key to GitHub (skip if you have already done this)
+  1. Run the following command on your host: `ssh-keygen -t ed25519 -C "your_email@example.com"`. When it finishes, your public key will be generated at `/home/you/.ssh/id_ed25519.pub`
+  2. Go to GitHub Settings, click "SSH and GPG keys", then click "New SSH key" and add your public key
 
 * Build examples
   ```shell
@@ -43,8 +45,8 @@
   ```
 
 * Simple test
-  1. Create two consoles (one for sending and one for receiving)
-  2. The receiving end performs the following operations:
+  1. Open two terminals (one for sending, one for receiving)
+  2. On the receiving end, perform the following operations:
      ```shell
      $ cd git_things/examples/
      $ ./gitt
@@ -77,7 +79,7 @@
      Interval time: 5 second
      Entering the loop, you can press any key to end it
      ```
-  3. The sending end does the following operations:
+  3. On the sending end, perform the following operations:
      ```shell
      $ cd git_things/examples/
      $ ./gitt
@@ -112,7 +114,7 @@
 
      GITT#
      ```
-  4. Check your receiving end, the following log will appear:
+  4. On the receiving end, you will see the following log:
      ```shell
      Example Device <0000000000000000> 1701617598 +0800:   This is test event!!
      ```

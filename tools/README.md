@@ -1,5 +1,8 @@
 # Tools
-For testing and evaluating Git Things.
+
+[English](README.md) | [简体中文](README_zh.md)
+
+Tools for testing and evaluating Git Things.
 
 ## Test
 
@@ -13,7 +16,7 @@ For testing and evaluating Git Things.
   STR SHA1: ac56d9346cb1f8950d141426c5cf4f63749e18fb
   BIN SHA1: 059217ea0faca8c1c25aa6849b9c37a5ee367998
   ```
-* Reference python results:
+* Results from the reference Python script:
   ```shell
   $ python python/refs_sha1.py
   STR SHA1: ac56d9346cb1f8950d141426c5cf4f63749e18fb
