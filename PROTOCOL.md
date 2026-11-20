@@ -72,9 +72,11 @@ client                                        server (git-upload-pack)
 * The following lines list the repository's refs. GITT keeps the ref
   whose SHA-1 equals HEAD's (the branch HEAD points at); it is used as
   the ref to fetch and later to push.
-* **Empty repository**: the first pkt is already the flush (`0000`).
-  GITT treats the remote as having no head; the pull ends here (the
-  client sends a flush and closes the connection).
+* **Empty repository**: older git versions send the flush (`0000`)
+  immediately; newer versions send a single pseudo-ref line
+  `<40 zeros> capabilities^{} <capabilities>\0` first. GITT treats
+  a null head as an empty repository; the pull ends here (the client
+  sends a flush and closes the connection).
 
 ### 2.2 Negotiation (client → server)
 

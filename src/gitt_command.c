@@ -172,6 +172,21 @@ int gitt_command_say_byebye(struct gitt_ssh* ssh)
 	return 0;
 }
 
+/*
+ * Whether a hex SHA-1 is null (all zeros). Newer git versions
+ * advertise an empty repository with a "capabilities^{}" pseudo-ref
+ * whose SHA-1 is null.
+ */
+static int gitt_command_is_null_hex(const char *hex)
+{
+	int i;
+
+	for (i = 0; i < GITT_SHA1_HEX_SIZE; i++)
+		if (hex[i] != '0')
+			return 0;
+	return 1;
+}
+
 int gitt_command_get_head(struct gitt_ssh* ssh,
 			  char head[GITT_SHA1_HEX_SIZE + 1],
 			  char refs[GITT_REPOSITORY_REF_SIZE])
@@ -200,6 +215,17 @@ int gitt_command_get_head(struct gitt_ssh* ssh,
 	head[GITT_SHA1_HEX_SIZE] = '\0';
 	length -= GITT_SHA1_HEX_SIZE;
 	gitt_log_debug("HEAD: %s\n", head);
+
+	/*
+	 * Empty repository: newer git versions advertise it with the
+	 * "capabilities^{}" pseudo-ref whose SHA-1 is all zeros (older
+	 * versions send a bare flush, handled above). The ref loop
+	 * below immediately hits the flush.
+	 */
+	if (gitt_command_is_null_hex(head)) {
+		gitt_log_debug("Remote repository is empty\n");
+		head[0] = '\0';
+	}
 
 	/* We don't care about the rest of the data */
 	while (length) {

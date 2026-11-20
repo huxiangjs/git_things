@@ -68,8 +68,10 @@ client                                        server (git-upload-pack)
   忽略其内容）。
 * 后续行列出仓库的 ref。GITT 保留 SHA-1 与 HEAD 相同的那一行（HEAD
   所指向的分支），之后用它作为 fetch 和 push 的 ref。
-* **空仓库**：第一个 pkt 就是 flush（`0000`）。GITT 把远端视为没有
-  head；拉取到此结束（客户端发一个 flush 并关闭连接）。
+* **空仓库**：旧版 git 直接发 flush（`0000`）；新版 git 先发一行
+  伪 ref：`<40 个 0> capabilities^{} <capabilities>\0`。GITT 把
+  null head 视为空仓库；拉取到此结束（客户端发一个 flush 并关闭
+  连接）。
 
 ### 2.2 协商（client → server）
 
