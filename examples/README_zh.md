@@ -50,89 +50,98 @@
      ```shell
      $ cd git_things/examples/
      $ ./gitt
-     Home directory: /home/huxiang
-     ...... (Log is omitted here)
-     Usage:
-         init:  init [repository] <privkey>  -- Initialize GITT
-         exit:  exit                         -- Exit GITT
-         loop:  loop <time> [dir]            -- Poll the file snapshot, report file changes
-     pushfile:  pushfile <dir> [msg]         -- Back up files of a directory
-     pullfile:  pullfile [dir]               -- Restore the latest file snapshot
-         help:  help                         -- Show help
+     ==================================================
+       GITT v1_00 - Git Things
+       serverless file sync over the git protocol
+     ==================================================
+
+       Commands:
+         init <repository> [privkey]
+           Initialize GITT
+         loop [time] [dir]
+           Poll the file snapshot, report file changes
+         pushfile <dir> [msg]
+           Back up the files of a directory
+         pullfile [dir]
+           Restore the latest file snapshot
+         help
+           Show this help
+         exit
+           Exit GITT
      GITT# init git@github.com:huxiangjs/gitt_example.git
-     Repository URL: git@github.com:huxiangjs/gitt_example.git
-     Privkey path: /home/huxiang/.ssh/id_ed25519
-     Private key loading completed
-
-     !! Note: Initializing will connect to the repository below and
-     sync the remote head. The remote data will not be modified.
-     Repository: git@github.com:huxiangjs/gitt_example.git
-     Please confirm whether to continue? (no/yes): yes
-
-     Initialize...
-     Initialize result: Successful
-     HEAD: 3e1df6385da0edf2965f9cb9880e5a1a984f3c46
-     Refs: refs/heads/main
-     Device name: Example Device
-     Device id:   0000000000000000
+       repository   git@github.com:huxiangjs/gitt_example.git
+       private key  /home/huxiang/.ssh/id_ed25519
+       key loaded (399 bytes)
+       !! init connects to the repository and syncs the remote head;
+       !! the remote data will not be modified.
+       Continue? (y/N) y
+       connecting...
+       head         3e1df6385da0edf2965f9cb9880e5a1a984f3c46
+       refs         refs/heads/main
+       device       Example Device (0000000000000000)
+       Ready.
 
      GITT# loop
-     Polling ./gitt_files every 5 second(s), press any key to end
+       polling ./gitt_files every 5s - press any key to stop
      ```
   3. 发送端执行以下操作：
      ```shell
      $ cd git_things/examples/
      $ ./gitt
-     Home directory: /home/huxiang
-     ...... (Log is omitted here)
-     Usage:
-         init:  init [repository] <privkey>  -- Initialize GITT
-         exit:  exit                         -- Exit GITT
-         loop:  loop <time> [dir]            -- Poll the file snapshot, report file changes
-     pushfile:  pushfile <dir> [msg]         -- Back up files of a directory
-     pullfile:  pullfile [dir]               -- Restore the latest file snapshot
-         help:  help                         -- Show help
+     ==================================================
+       GITT v1_00 - Git Things
+       serverless file sync over the git protocol
+     ==================================================
+
+       Commands:
+         init <repository> [privkey]
+           Initialize GITT
+         loop [time] [dir]
+           Poll the file snapshot, report file changes
+         pushfile <dir> [msg]
+           Back up the files of a directory
+         pullfile [dir]
+           Restore the latest file snapshot
+         help
+           Show this help
+         exit
+           Exit GITT
      GITT# init git@github.com:huxiangjs/gitt_example.git
-     Repository URL: git@github.com:huxiangjs/gitt_example.git
-     Privkey path: /home/huxiang/.ssh/id_ed25519
-     Private key loading completed
-
-     !! Note: Initializing will connect to the repository below and
-     sync the remote head. The remote data will not be modified.
-     Repository: git@github.com:huxiangjs/gitt_example.git
-     Please confirm whether to continue? (no/yes): yes
-
-     Initialize...
-     Initialize result: Successful
-     HEAD: 3e1df6385da0edf2965f9cb9880e5a1a984f3c46
-     Refs: refs/heads/main
-     Device name: Example Device
-     Device id:   0000000000000000
+       repository   git@github.com:huxiangjs/gitt_example.git
+       private key  /home/huxiang/.ssh/id_ed25519
+       key loaded (399 bytes)
+       !! init connects to the repository and syncs the remote head;
+       !! the remote data will not be modified.
+       Continue? (y/N) y
+       connecting...
+       head         3e1df6385da0edf2965f9cb9880e5a1a984f3c46
+       refs         refs/heads/main
+       device       Example Device (0000000000000000)
+       Ready.
 
      GITT# pushfile ./my_dir "backup of my_dir"
-     Please wait...
-     Push file result: Successful
+       pushing 2 file(s) from './my_dir' ... ok
 
      GITT#
      ```
   4. 接收端的循环会恢复文件并报告变化：
      ```shell
-       restored ./gitt_files/hello.txt (12 bytes)
-       added:   hello.txt
+       [14:03:22] restored ./gitt_files/hello.txt (12 bytes)
+       [14:03:22] added:   hello.txt
      ```
 
 * 文件备份 / 恢复
   1. 发送端把本地目录备份到仓库：
      ```shell
      GITT# pushfile ./my_dir "backup of my_dir"
-     Please wait...
-     Push file result: Successful
+       pushing 2 file(s) from './my_dir' ... ok
      ```
   2. 接收端把最新快照恢复到本地目录：
      ```shell
      GITT# pullfile ./restored
-     Please wait...
-     Pull file result: Successful (files in ./restored)
+       restoring the latest snapshot into ./restored
+       [14:05:10] restored ./restored/hello.txt (12 bytes)
+       ok (files in ./restored)
      ```
 
 ## 限制（移植参考）

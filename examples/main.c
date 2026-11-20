@@ -29,6 +29,7 @@
 #include <termios.h>
 #include <pwd.h>
 #include <string.h>
+#include <strings.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <gitt.h>
@@ -46,6 +47,27 @@
 #define EXAMPLE_STATE_RUN		1
 
 #define DEFAULT_LOOP_TIME		5
+
+/*
+ * Terminal colors: enabled only when stdout is a terminal, so piped
+ * and redirected output stays plain text
+ */
+static int color_on(void)
+{
+	static int enabled = -1;
+
+	if (enabled < 0)
+		enabled = isatty(STDOUT_FILENO);
+	return enabled;
+}
+
+#define COLOR(code)	(color_on() ? "\033[" code "m" : "")
+#define C_BOLD		COLOR("1")
+#define C_RED		COLOR("31")
+#define C_GREEN		COLOR("32")
+#define C_YELLOW	COLOR("33")
+#define C_PROMPT	COLOR("1;36")
+#define C_RESET		COLOR("0")
 
 /*
  * The user buffer. It doubles as the pack/unpack work area, so a
@@ -68,7 +90,8 @@ typedef int (*cmd_func)(struct gitt_example *example, int args, char *argv[]);
 struct cmd_item {
 	char *name;
 	cmd_func func;
-	char *help;
+	char *usage;
+	char *desc;
 };
 
 /* Get user home */
@@ -81,23 +104,23 @@ static int get_home(struct gitt_example *example)
 		fprintf(stderr, "Cannot get user information\n");
 		return -1;
 	}
-	printf("Home directory: %s\n", pw->pw_dir);
 	example->home = pw->pw_dir;
 
 	return 0;
 }
 
-static int print_warning(struct gitt_example *example)
+static int print_warning(void)
 {
 	char buf[64] = {0};
 	int ret = -1;
 
-	printf("\n!! Note: Initializing will connect to the repository below and\n");
-	printf("sync the remote head. The remote data will not be modified.\n");
-	printf("Repository: %s\n", example->repository);
-	printf("Please confirm whether to continue? (no/yes): ");
+	printf("  %s!! init connects to the repository and syncs the remote head;%s\n",
+	       C_YELLOW, C_RESET);
+	printf("  %s!! the remote data will not be modified.%s\n", C_YELLOW, C_RESET);
+	printf("  Continue? (y/N) ");
 
-	if (scanf("%63s", buf) == 1 && !strcmp(buf, "yes"))
+	if (scanf("%63s", buf) == 1 &&
+	    (!strcasecmp(buf, "y") || !strcasecmp(buf, "yes")))
 		ret = 0;
 
 	/* Consume the rest of the line */
@@ -111,34 +134,13 @@ static int print_warning(struct gitt_example *example)
 	return ret;
 }
 
-static void print_info(void)
+static void print_banner(void)
 {
-	const char *license =
-		"\n"
-		"MIT License\n"
-		"\n"
-		"Copyright (c) 2023 Hoozz <huxiangjs@foxmail.com>\n"
-		"\n"
-		"Permission is hereby granted, free of charge, to any person obtaining a copy\n"
-		"of this software and associated documentation files (the \"Software\"), to deal\n"
-		"in the Software without restriction, including without limitation the rights\n"
-		"to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n"
-		"copies of the Software, and to permit persons to whom the Software is\n"
-		"furnished to do so, subject to the following conditions:\n"
-		"\n"
-		"The above copyright notice and this permission notice shall be included in all\n"
-		"copies or substantial portions of the Software.\n"
-		"\n"
-		"THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
-		"IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
-		"FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
-		"AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n"
-		"LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n"
-		"OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n"
-		"SOFTWARE.\n";
-
-	puts(license);
-	printf("GITT Version: %s\n", gitt_version());
+	printf("================================================\n");
+	printf("  %sGITT v%s%s - Git Things\n", C_BOLD, gitt_version(),
+	       C_RESET);
+	printf("  serverless file sync over the git protocol\n");
+	printf("================================================\n");
 }
 
 static int gitt_get_date_impl(char *buf, uint8_t size)
@@ -182,7 +184,7 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 
 	/* A repository url is required */
 	if (args < 2) {
-		fprintf(stderr, "Invalid: Please enter the repository URL\n");
+		fprintf(stderr, "Missing: the repository URL\n");
 		return -1;
 	}
 	if (strlen(argv[1]) + 1 > sizeof(example->repository)) {
@@ -190,7 +192,7 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 		return -1;
 	}
 	strcpy(example->repository, argv[1]);
-	printf("Repository URL: %s\n", argv[1]);
+	printf("  repository   %s\n", argv[1]);
 
 	if (args >= 3) {
 		if (strlen(argv[2]) + 1 > sizeof(privkey_path)) {
@@ -205,7 +207,7 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 			return -1;
 		}
 	}
-	printf("Privkey path: %s\n", privkey_path);
+	printf("  private key  %s\n", privkey_path);
 
 	/* Read key file */
 	file = fopen(privkey_path, "rb");
@@ -221,10 +223,10 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 		return -1;
 	}
 	example->privkey[ret] = '\0';
-	printf("Private key loading completed\n");
+	printf("  key loaded (%d bytes)\n", (int)ret);
 	fclose(file);
 
-	ret = print_warning(example);
+	ret = print_warning();
 	if (ret)
 		return ret;
 
@@ -238,20 +240,23 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 	example->g.get_date = gitt_get_date_impl;
 	example->g.get_zone = gitt_get_zone_impl;
 
-	printf("Initialize...\n");
+	printf("  connecting...\n");
 	ret = gitt_init(&example->g);
-	printf("Initialize result: %s\n", GITT_ERRNO_STR(ret));
-	if (ret)
+	if (ret) {
+		printf("  %sFAILED: %s%s\n", C_RED, GITT_ERRNO_STR(ret), C_RESET);
 		return ret;
+	}
 
-	printf("HEAD: %s\n", example->g.repository.head);
-	printf("Refs: %s\n", example->g.repository.refs);
+	printf("  head         %s\n", example->g.repository.head);
+	printf("  refs         %s\n", example->g.repository.refs);
 
 	/* Set device info */
 	strcpy(example->g.device.name, EXAMPLE_DEVICE_NAME);
 	strcpy(example->g.device.id, EXAMPLE_DEVICE_ID);
-	printf("Device name: %s\n", example->g.device.name);
-	printf("Device id:   %s\n", example->g.device.id);
+	printf("  device       %s (%s)\n", example->g.device.name,
+	       example->g.device.id);
+
+	printf("  %sReady.%s\n", C_GREEN, C_RESET);
 
 	example->state = EXAMPLE_STATE_RUN;
 
@@ -376,11 +381,27 @@ static void gitt_mkdir_parent(char *path)
 	}
 }
 
+/*
+ * The timestamp printed with the restored/changed lines of a pull:
+ * set by the caller right before gitt_pull()
+ */
+static time_t pull_time;
+
+static void pull_time_stamp(char *buf, int size)
+{
+	struct tm tm;
+
+	localtime_r(&pull_time, &tm);
+	snprintf(buf, size, "%02d:%02d:%02d", tm.tm_hour, tm.tm_min,
+		 tm.tm_sec);
+}
+
 static void gitt_file_callback(struct gitt *g, char *path,
 			       uint8_t *data, uint32_t size)
 {
 	struct gitt_example *example = gitt_containerof(g, struct gitt_example, g);
 	char full[256];
+	char stamp[16];
 	FILE *file;
 
 	snprintf(full, sizeof(full), "%s/%s", example->out_dir, path);
@@ -394,7 +415,8 @@ static void gitt_file_callback(struct gitt *g, char *path,
 	if (fwrite(data, 1, size, file) != size)
 		fprintf(stderr, "Error writing file: %s\n", full);
 	fclose(file);
-	printf("  restored %s (%u bytes)\n", full, size);
+	pull_time_stamp(stamp, sizeof(stamp));
+	printf("  [%s] restored %s (%u bytes)\n", stamp, full, size);
 }
 
 static int cmd_func_pushfile(struct gitt_example *example, int args, char *argv[])
@@ -406,12 +428,12 @@ static int cmd_func_pushfile(struct gitt_example *example, int args, char *argv[
 	int ret;
 
 	if (example->state != EXAMPLE_STATE_RUN) {
-		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
+		fprintf(stderr, "Not initialized: run 'init' first\n");
 		return -1;
 	}
 
 	if (args < 2) {
-		fprintf(stderr, "Invalid: Please enter the directory to back up\n");
+		fprintf(stderr, "Missing: the directory to back up\n");
 		return -1;
 	}
 
@@ -434,10 +456,13 @@ static int cmd_func_pushfile(struct gitt_example *example, int args, char *argv[
 		}
 	}
 
-	printf("Please wait...\n");
+	printf("  pushing %d file(s) from '%s' ... ", count, argv[1]);
 	ret = gitt_commit_files(&example->g, files, count,
 				message[0] ? message : NULL);
-	printf("Push file result: %s\n", GITT_ERRNO_STR(ret));
+	if (ret)
+		printf("%sFAILED: %s%s\n", C_RED, GITT_ERRNO_STR(ret), C_RESET);
+	else
+		printf("%sok%s\n", C_GREEN, C_RESET);
 
 	for (index = 0; index < count; index++)
 		free(files[index].data);
@@ -453,7 +478,7 @@ static int cmd_func_pullfile(struct gitt_example *example, int args, char *argv[
 	int ret;
 
 	if (example->state != EXAMPLE_STATE_RUN) {
-		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
+		fprintf(stderr, "Not initialized: run 'init' first\n");
 		return -1;
 	}
 
@@ -466,17 +491,24 @@ static int cmd_func_pullfile(struct gitt_example *example, int args, char *argv[
 
 	example->g.file_dump = gitt_file_callback;
 
-	printf("Please wait...\n");
+	pull_time = time(NULL);
+	printf("  restoring the latest snapshot into %s\n", example->out_dir);
 	ret = gitt_pull(&example->g);
-	printf("Pull file result: %s (files in %s)\n",
-	       GITT_ERRNO_STR(ret), example->out_dir);
+	if (ret)
+		printf("  %sFAILED: %s%s\n", C_RED, GITT_ERRNO_STR(ret), C_RESET);
+	else
+		printf("  %sok%s (files in %s)\n", C_GREEN, C_RESET,
+		       example->out_dir);
 	if (ret)
 		return -1;
 
 	return 0;
 }
 
-/* Detect any key press */
+/*
+ * Detect any key press: returns the key, 0 if none was pressed, or
+ * -1 if stdin is closed (a piped input ran out)
+ */
 static int hit(void)
 {
 	struct termios oldt, newt;
@@ -497,6 +529,8 @@ static int hit(void)
 
 	if (ch != EOF)
 		return ch;
+	if (feof(stdin))
+		return -1;
 
 	return 0;
 }
@@ -522,18 +556,20 @@ static uint8_t loop_prev_num;
 static void loop_report_changes(struct gitt *g)
 {
 	struct gitt_repository *r = &g->repository;
+	char stamp[16];
 	uint8_t i, j;
 	int changed = 0;
 
+	pull_time_stamp(stamp, sizeof(stamp));
 	for (i = 0; i < r->file_num; i++) {
 		for (j = 0; j < loop_prev_num; j++)
 			if (!strcmp(loop_prev_files[j].path, r->files[i].path))
 				break;
 		if (j == loop_prev_num) {
-			printf("  added:   %s\n", r->files[i].path);
+			printf("  [%s] added:   %s\n", stamp, r->files[i].path);
 			changed = 1;
 		} else if (strcmp(loop_prev_files[j].sha1, r->files[i].sha1)) {
-			printf("  changed: %s\n", r->files[i].path);
+			printf("  [%s] changed: %s\n", stamp, r->files[i].path);
 			changed = 1;
 		}
 	}
@@ -542,12 +578,13 @@ static void loop_report_changes(struct gitt *g)
 			if (!strcmp(loop_prev_files[j].path, r->files[i].path))
 				break;
 		if (i == r->file_num) {
-			printf("  deleted: %s\n", loop_prev_files[j].path);
+			printf("  [%s] deleted: %s\n", stamp,
+			       loop_prev_files[j].path);
 			changed = 1;
 		}
 	}
 	if (!changed)
-		printf("  (no change)\n");
+		printf("  [%s] (no change)\n", stamp);
 
 	for (i = 0; i < r->file_num; i++) {
 		strcpy(loop_prev_files[i].path, r->files[i].path);
@@ -564,7 +601,7 @@ static int cmd_func_loop(struct gitt_example *example, int args, char *argv[])
 	int running = 1;
 
 	if (example->state != EXAMPLE_STATE_RUN) {
-		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
+		fprintf(stderr, "Not initialized: run 'init' first\n");
 		return -1;
 	}
 
@@ -583,14 +620,19 @@ static int cmd_func_loop(struct gitt_example *example, int args, char *argv[])
 
 	loop_prev_num = 0;
 
-	printf("Polling %s every %d second(s), press any key to end\n",
+	printf("  polling %s every %ds - press any key to stop\n",
 	       example->out_dir, interval);
 
 	while (running) {
+		pull_time = time(NULL);
 		ret = gitt_pull(&example->g);
-		if (ret)
-			printf("Pull fail: %s\n", GITT_ERRNO_STR(ret));
-		else
+		if (ret) {
+			char stamp[16];
+
+			pull_time_stamp(stamp, sizeof(stamp));
+			printf("  [%s] %sFAILED: %s%s\n", stamp, C_RED,
+			       GITT_ERRNO_STR(ret), C_RESET);
+		} else
 			loop_report_changes(&example->g);
 
 		count = 0;
@@ -603,7 +645,7 @@ static int cmd_func_loop(struct gitt_example *example, int args, char *argv[])
 		}
 	}
 
-	printf("\nExit loop\n");
+	printf("  loop stopped\n");
 
 	return 0;
 }
@@ -618,21 +660,25 @@ static int cmd_func_exit(struct gitt_example *example, int args, char *argv[])
 
 /* Menu */
 static struct cmd_item cmd_list[] = {
-	{"init",     cmd_func_init,     "init [repository] <privkey>  -- Initialize GITT"},
-	{"exit",     cmd_func_exit,     "exit                         -- Exit GITT"},
-	{"loop",     cmd_func_loop,     "loop <time> [dir]            -- Poll the file snapshot, report file changes"},
-	{"pushfile", cmd_func_pushfile, "pushfile <dir> [msg]         -- Back up files of a directory"},
-	{"pullfile", cmd_func_pullfile, "pullfile [dir]               -- Restore the latest file snapshot"},
-	{"help",     cmd_func_help,     "help                         -- Show help"},
+	{"init",     cmd_func_init,     "<repository> [privkey]", "Initialize GITT"},
+	{"loop",     cmd_func_loop,     "[time] [dir]",           "Poll the file snapshot, report file changes"},
+	{"pushfile", cmd_func_pushfile, "<dir> [msg]",            "Back up the files of a directory"},
+	{"pullfile", cmd_func_pullfile, "[dir]",                  "Restore the latest file snapshot"},
+	{"help",     cmd_func_help,     "",                       "Show this help"},
+	{"exit",     cmd_func_exit,     "",                       "Exit GITT"},
 };
 
 static void print_help(void)
 {
 	int index;
 
-	printf("\nUsage:\n");
-	for (index = 0; index < sizeof(cmd_list)/sizeof(cmd_list[0]); index++)
-		printf("%8s:  %s\n", cmd_list[index].name, cmd_list[index].help);
+	printf("\n  Commands:\n");
+	for (index = 0; index < sizeof(cmd_list)/sizeof(cmd_list[0]); index++) {
+		printf("    %s", cmd_list[index].name);
+		if (cmd_list[index].usage[0])
+			printf(" %s", cmd_list[index].usage);
+		printf("\n      %s\n", cmd_list[index].desc);
+	}
 }
 
 /* Parse parameters in a line */
@@ -691,11 +737,11 @@ int main(int args, char *argv[])
 	if (ret)
 		return ret;
 
-	print_info();
+	print_banner();
 	print_help();
 
 	while (ret != -2) {
-		printf("GITT# ");
+		printf("%sGITT#%s ", C_PROMPT, C_RESET);
 		ret = read_parse_line(input, sizeof(input), arg_list);
 		if (!ret) {
 			/* EOF: stop (piped input exhausted); empty line: re-prompt */
@@ -715,12 +761,13 @@ int main(int args, char *argv[])
 			}
 		}
 		if (index >= sizeof(cmd_list)/sizeof(cmd_list[0])) {
-			fprintf(stderr, "Unknown command: %s\n", arg_list[0]);
+			fprintf(stderr, "%sUnknown command: %s%s\n", C_RED,
+				arg_list[0], C_RESET);
 			print_help();
 		}
 	}
 
-	printf("Exited\n");
+	printf("Bye.\n");
 
 	return 0;
 }
