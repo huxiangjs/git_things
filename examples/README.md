@@ -54,17 +54,18 @@
      ...... (Log is omitted here)
      Usage:
          init:  init [repository] <privkey>  -- Initialize GITT
-         exit:  exit                        -- Exit GITT
-      history:  history                     -- View historical events
-       commit:  commit [event]              -- Commit a event
-         loop:  loop <time>                 -- Loop to get events
-         help:  help                        -- Show help
+         exit:  exit                         -- Exit GITT
+         loop:  loop <time> [dir]            -- Poll the file snapshot, report file changes
+     pushfile:  pushfile <dir> [msg]         -- Back up files of a directory
+     pullfile:  pullfile [dir]               -- Restore the latest file snapshot
+         help:  help                         -- Show help
      GITT# init git@github.com:huxiangjs/gitt_example.git
      Repository URL: git@github.com:huxiangjs/gitt_example.git
      Privkey path: /home/huxiang/.ssh/id_ed25519
      Private key loading completed
 
-     !! Warning: The following repository will be formatted and all data will    be   lost.
+     !! Note: Initializing will connect to the repository below and
+     sync the remote head. The remote data will not be modified.
      Repository: git@github.com:huxiangjs/gitt_example.git
      Please confirm whether to continue? (no/yes): yes
 
@@ -76,8 +77,7 @@
      Device id:   0000000000000000
 
      GITT# loop
-     Interval time: 5 second
-     Entering the loop, you can press any key to end it
+     Polling ./gitt_files every 5 second(s), press any key to end
      ```
   3. On the sending end, perform the following operations:
      ```shell
@@ -87,17 +87,18 @@
      ...... (Log is omitted here)
      Usage:
          init:  init [repository] <privkey>  -- Initialize GITT
-         exit:  exit                        -- Exit GITT
-      history:  history                     -- View historical events
-       commit:  commit [event]              -- Commit a event
-         loop:  loop <time>                 -- Loop to get events
-         help:  help                        -- Show help
+         exit:  exit                         -- Exit GITT
+         loop:  loop <time> [dir]            -- Poll the file snapshot, report file changes
+     pushfile:  pushfile <dir> [msg]         -- Back up files of a directory
+     pullfile:  pullfile [dir]               -- Restore the latest file snapshot
+         help:  help                         -- Show help
      GITT# init git@github.com:huxiangjs/gitt_example.git
      Repository URL: git@github.com:huxiangjs/gitt_example.git
      Privkey path: /home/huxiang/.ssh/id_ed25519
      Private key loading completed
 
-     !! Warning: The following repository will be formatted and all data will be      lost.
+     !! Note: Initializing will connect to the repository below and
+     sync the remote head. The remote data will not be modified.
      Repository: git@github.com:huxiangjs/gitt_example.git
      Please confirm whether to continue? (no/yes): yes
 
@@ -108,13 +109,32 @@
      Device name: Example Device
      Device id:   0000000000000000
 
-     GITT# commit This is test event!!
+     GITT# pushfile ./my_dir "backup of my_dir"
      Please wait...
-     Commit event result: Successful
+     Push file result: Successful
 
      GITT#
      ```
-  4. On the receiving end, you will see the following log:
+  4. On the receiving end, the loop restores the files and reports the changes:
      ```shell
-     Example Device <0000000000000000> 1701617598 +0800:   This is test event!!
+       restored ./gitt_files/hello.txt (12 bytes)
+       added:   hello.txt
      ```
+
+* File backup / restore
+  1. On the sending end, back up a local directory to the repository:
+     ```shell
+     GITT# pushfile ./my_dir "backup of my_dir"
+     Please wait...
+     Push file result: Successful
+     ```
+  2. On the receiving end, restore the latest snapshot to a local directory:
+     ```shell
+     GITT# pullfile ./restored
+     Please wait...
+     Pull file result: Successful (files in ./restored)
+     ```
+
+## Limits (for porting)
+* The example's buffer is `GITT_CONFIG_BUF_SIZE` (4096) from [gitt_config.h](gitt_config.h), so the largest file GITT itself can pull back is 4095 bytes (`GITT_CONFIG_MAX_OBJECT` follows the buffer size).
+* Every tunable limit and default of the library is a macro of [gitt_config.h](gitt_config.h) — the global config the GITT core includes. When porting to a microcontroller, provide your own gitt_config.h on the include path and size the RAM from it (each entry notes where the cap is enforced in the library); the protocol-fixed limits are summarized in the READMEs' Limits sections.

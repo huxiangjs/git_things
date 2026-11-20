@@ -36,8 +36,9 @@ typedef int (*gitt_obj_data)(void *p, uint8_t *buf, uint16_t size, bool end);
 
 struct gitt_obj {
 	uint8_t type;
-	uint16_t size;
+	uint32_t size;
 	void *data;
+	char sha1[41];
 };
 
 extern const char *gitt_obj_types[];

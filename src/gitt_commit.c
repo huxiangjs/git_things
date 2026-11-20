@@ -23,24 +23,35 @@
  */
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <gitt_commit.h>
 #include <gitt_log.h>
 #include <gitt_sha1.h>
 #include <string.h>
 #include <gitt_errno.h>
 
-static char *gitt_commit_find_line_end(char *buf, uint16_t size, char dir)
+/*
+ * The object id header "<type> <size>\0" (longest:
+ * "ofs_delta 4294967295")
+ */
+#define GITT_OBJECT_HEADER_SIZE	24
+
+/* The marker that closes a gpgsig header (PGP format, fixed) */
+#define GITT_PGP_END		"-----END PGP SIGNATURE"
+
+/* Find the nearest '\n' (forward, or backward when 'backward' is set) */
+static char *gitt_commit_find_line_end(char *buf, uint16_t size, bool backward)
 {
 	uint16_t index;
 
-	if (dir == 'D') {
+	if (!backward) {
 		index = 0;
 		while (index < size) {
 			if (buf[index] == '\n')
 				return buf + index;
 			index++;
 		}
-	} else if (dir == 'U') {
+	} else {
 		index = size;
 		while (index > 0) {
 			index--;
@@ -70,7 +81,7 @@ static int gitt_commit_sha1(char *buf, uint16_t size, struct gitt_commit_id *id)
 {
 	struct gitt_sha1 sha1;
 	int ret;
-	char front_str[16];
+	char front_str[GITT_OBJECT_HEADER_SIZE];
 
 	gitt_sha1_init(&sha1);
 
@@ -131,7 +142,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 		if (!strcmp(start, "tree")) {
 			start += 5;
 			valid_size -= 5;
-			next = gitt_commit_find_line_end(start, valid_size, 'D');
+			next = gitt_commit_find_line_end(start, valid_size, false);
 			if (!next)
 				return -GITT_ERRNO_INVAL;
 			*next = '\0';
@@ -141,9 +152,23 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			valid_size -= next - start + 1;
 			start = next + 1;
 		} else if (!strcmp(start, "parent")) {
+			if (strlen(commit->parent.sha1)) {
+				/*
+				 * Extra parent line (merge commit): only the
+				 * first parent is remembered, skip the rest
+				 */
+				next = gitt_commit_find_line_end(start, valid_size, false);
+				if (!next)
+					return -GITT_ERRNO_INVAL;
+				*next = '\0';
+				valid_size -= next - start + 1;
+				start = next + 1;
+				continue;
+			}
+
 			start += 7;
 			valid_size -= 7;
-			next = gitt_commit_find_line_end(start, valid_size, 'D');
+			next = gitt_commit_find_line_end(start, valid_size, false);
 			if (!next)
 				return -GITT_ERRNO_INVAL;
 			*next = '\0';
@@ -183,7 +208,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			start = next + 1;
 
 			/* Zone */
-			next = gitt_commit_find_line_end(start, valid_size, 'D');
+			next = gitt_commit_find_line_end(start, valid_size, false);
 			if (!next)
 				return -GITT_ERRNO_INVAL;
 			*next = '\0';
@@ -222,7 +247,7 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			start = next + 1;
 
 			/* Zone */
-			next = gitt_commit_find_line_end(start, valid_size, 'D');
+			next = gitt_commit_find_line_end(start, valid_size, false);
 			if (!next)
 				return -GITT_ERRNO_INVAL;
 			*next = '\0';
@@ -230,15 +255,50 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 			valid_size -= next - start + 1;
 			start = next + 1;
 		} else {
-			gitt_log_debug("break\n");
-			valid_size -= cur - start + 1;
-			start = cur + 1;
-			break;
+			/*
+			 * An unknown header line (e.g. 'encoding', 'gpgsig'):
+			 * skip the line and keep going; the message starts
+			 * after the empty line that follows the last header.
+			 */
+			gitt_log_debug("Skip header line: %s\n", start);
+
+			if (!strcmp(start, "gpgsig")) {
+				/*
+				 * A gpgsig value spans multiple lines, up to
+				 * and including the closing PGP marker: skip
+				 * them all
+				 */
+				do {
+					next = gitt_commit_find_line_end(start, valid_size, false);
+					if (!next)
+						return -GITT_ERRNO_INVAL;
+					*next = '\0';
+					valid_size -= next - start + 1;
+					start = next + 1;
+				} while (valid_size > 0 &&
+				         strncmp(start, GITT_PGP_END,
+					         sizeof(GITT_PGP_END) - 1));
+			} else {
+				next = gitt_commit_find_line_end(start, valid_size, false);
+				if (!next)
+					return -GITT_ERRNO_INVAL;
+				*next = '\0';
+				valid_size -= next - start + 1;
+				start = next + 1;
+			}
+			continue;
 		}
 	}
 
-	valid_size--;
-	start++;
+	/*
+	 * The loop stopped at the empty line that separates the headers
+	 * from the message; step over it (if there is no such line, the
+	 * commit has no message)
+	 */
+	if (valid_size > 0 && *start == '\n') {
+		valid_size--;
+		start++;
+	}
 	if (valid_size > 0) {
 		gitt_log_debug("Parse message\n");
 		commit->message = start;
@@ -449,7 +509,7 @@ int gitt_commit_sha1_update(struct gitt_commit *commit)
 {
 	struct gitt_sha1 sha1;
 	int ret;
-	char front_str[16];
+	char front_str[GITT_OBJECT_HEADER_SIZE];
 
 	gitt_sha1_init(&sha1);
 

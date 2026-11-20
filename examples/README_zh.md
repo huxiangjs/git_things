@@ -54,17 +54,18 @@
      ...... (Log is omitted here)
      Usage:
          init:  init [repository] <privkey>  -- Initialize GITT
-         exit:  exit                        -- Exit GITT
-      history:  history                     -- View historical events
-       commit:  commit [event]              -- Commit a event
-         loop:  loop <time>                 -- Loop to get events
-         help:  help                        -- Show help
+         exit:  exit                         -- Exit GITT
+         loop:  loop <time> [dir]            -- Poll the file snapshot, report file changes
+     pushfile:  pushfile <dir> [msg]         -- Back up files of a directory
+     pullfile:  pullfile [dir]               -- Restore the latest file snapshot
+         help:  help                         -- Show help
      GITT# init git@github.com:huxiangjs/gitt_example.git
      Repository URL: git@github.com:huxiangjs/gitt_example.git
      Privkey path: /home/huxiang/.ssh/id_ed25519
      Private key loading completed
 
-     !! Warning: The following repository will be formatted and all data will    be   lost.
+     !! Note: Initializing will connect to the repository below and
+     sync the remote head. The remote data will not be modified.
      Repository: git@github.com:huxiangjs/gitt_example.git
      Please confirm whether to continue? (no/yes): yes
 
@@ -76,8 +77,7 @@
      Device id:   0000000000000000
 
      GITT# loop
-     Interval time: 5 second
-     Entering the loop, you can press any key to end it
+     Polling ./gitt_files every 5 second(s), press any key to end
      ```
   3. 发送端执行以下操作：
      ```shell
@@ -87,17 +87,18 @@
      ...... (Log is omitted here)
      Usage:
          init:  init [repository] <privkey>  -- Initialize GITT
-         exit:  exit                        -- Exit GITT
-      history:  history                     -- View historical events
-       commit:  commit [event]              -- Commit a event
-         loop:  loop <time>                 -- Loop to get events
-         help:  help                        -- Show help
+         exit:  exit                         -- Exit GITT
+         loop:  loop <time> [dir]            -- Poll the file snapshot, report file changes
+     pushfile:  pushfile <dir> [msg]         -- Back up files of a directory
+     pullfile:  pullfile [dir]               -- Restore the latest file snapshot
+         help:  help                         -- Show help
      GITT# init git@github.com:huxiangjs/gitt_example.git
      Repository URL: git@github.com:huxiangjs/gitt_example.git
      Privkey path: /home/huxiang/.ssh/id_ed25519
      Private key loading completed
 
-     !! Warning: The following repository will be formatted and all data will be      lost.
+     !! Note: Initializing will connect to the repository below and
+     sync the remote head. The remote data will not be modified.
      Repository: git@github.com:huxiangjs/gitt_example.git
      Please confirm whether to continue? (no/yes): yes
 
@@ -108,13 +109,32 @@
      Device name: Example Device
      Device id:   0000000000000000
 
-     GITT# commit This is test event!!
+     GITT# pushfile ./my_dir "backup of my_dir"
      Please wait...
-     Commit event result: Successful
+     Push file result: Successful
 
      GITT#
      ```
-  4. 在接收端，你将会看到如下日志：
+  4. 接收端的循环会恢复文件并报告变化：
      ```shell
-     Example Device <0000000000000000> 1701617598 +0800:   This is test event!!
+       restored ./gitt_files/hello.txt (12 bytes)
+       added:   hello.txt
      ```
+
+* 文件备份 / 恢复
+  1. 发送端把本地目录备份到仓库：
+     ```shell
+     GITT# pushfile ./my_dir "backup of my_dir"
+     Please wait...
+     Push file result: Successful
+     ```
+  2. 接收端把最新快照恢复到本地目录：
+     ```shell
+     GITT# pullfile ./restored
+     Please wait...
+     Pull file result: Successful (files in ./restored)
+     ```
+
+## 限制（移植参考）
+* 示例的 buffer 是 [gitt_config.h](gitt_config.h) 里的 `GITT_CONFIG_BUF_SIZE`（4096），因此 GITT 自己最多只能拉回 4095 字节的文件（`GITT_CONFIG_MAX_OBJECT` 跟着 buffer 大小走）。
+* 库的全部可配置限制与默认值都是 [gitt_config.h](gitt_config.h) 的宏——core 所 include 的全局配置。移植到单片机时，在 include 路径上提供自己的 gitt_config.h，并按它评估内存（每条都注明了限制在库里的真实出处）；协议限定的限制汇总在 README 的"限制"一节。

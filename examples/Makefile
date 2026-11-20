@@ -24,18 +24,23 @@ CROSS_COMPILE :=
 CC := $(CROSS_COMPILE)gcc
 
 CFLAGS := -I../include \
+	  -I. \
 	  -I../third_party/zlib \
 	  -O2 \
 	  -Wall \
 	  -Wno-pointer-to-int-cast
 
+DBGFLAGS := -O0 -g -DDEBUG
+
 LIBRARY := -lssh
 
-.PHONY: all clean
+.PHONY: all clean debug
 
-OBJS := gitt
+OBJS := gitt gitt_debug
 
-all: $(OBJS)
+all: gitt
+
+debug: gitt_debug
 
 clean:
 	rm -rf *.o *.a *.out $(OBJS)
@@ -52,6 +57,8 @@ GITT_SRCS += ../src/gitt_command.c
 GITT_SRCS += ../src/gitt_repository.c
 GITT_SRCS += ../src/gitt_commit.c
 GITT_SRCS += ../src/gitt_pack.c
+GITT_SRCS += ../src/gitt_tree.c
+GITT_SRCS += ../src/gitt_blob.c
 GITT_SRCS += ../src/gitt.c
 GITT_SRCS += ../third_party/zlib/adler32.c
 GITT_SRCS += ../third_party/zlib/crc32.c
@@ -67,3 +74,6 @@ GITT_SRCS += ../third_party/zlib/zutil.c
 
 gitt: $(GITT_SRCS)
 	$(CC) $(CFLAGS) $^ $(LIBRARY) -o $@
+
+gitt_debug: $(GITT_SRCS)
+	$(CC) $(CFLAGS) $(DBGFLAGS) $^ $(LIBRARY) -o $@

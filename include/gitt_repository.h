@@ -25,6 +25,8 @@
 #ifndef __GITT_REPOSITORY_H_
 #define __GITT_REPOSITORY_H_
 
+#include <stdint.h>
+#include <gitt_config.h>
 #include <gitt_unpack.h>
 #include <gitt_commit.h>
 #include <gitt_pack.h>
@@ -36,8 +38,18 @@ extern "C" {
 
 struct gitt_repository;
 
-typedef void (*gitt_repository_commit)(struct gitt_repository *repository,
-				      struct gitt_commit *commit);
+typedef void (*gitt_repository_blob)(struct gitt_repository *repository,
+				     char *path, uint8_t *data, uint32_t size);
+
+/*
+ * The file registry (path <-> SHA-1), built after a pull by walking
+ * the trees in the object store. It maps a blob (identified by its
+ * SHA-1) to the file path of the tip commit.
+ */
+struct gitt_repository_file {
+	char path[GITT_REPOSITORY_MAX_PATH];
+	char sha1[41];
+};
 
 struct gitt_repository {
 	struct gitt_unpack unpack;
@@ -45,17 +57,32 @@ struct gitt_repository {
 	char *url;
 	char *privkey;
 	char head[41];
-	char refs[32];
+	char refs[GITT_REPOSITORY_REF_SIZE];
 	uint8_t *buf;
 	uint16_t buf_len;
-	gitt_repository_commit commit_dump;
+	gitt_repository_blob blob_dump;
 	struct gitt_ssh* ssh;
+
+	/*
+	 * Set after a pull successfully restored the file tree of the
+	 * current head. The "already up to date" fast path only applies
+	 * when the files of that head are actually available in this
+	 * session (the client is stateless and keeps no objects).
+	 */
+	uint8_t files_loaded;
+
+	/* File registry (path <-> SHA-1), rebuilt after every pull */
+	uint8_t file_num;
+	struct gitt_repository_file files[GITT_REPOSITORY_MAX_FILES];
+	uint8_t tree_num;
+	char tree_sha1[GITT_REPOSITORY_MAX_TREES][41];
+	char tree_path[GITT_REPOSITORY_MAX_TREES][GITT_REPOSITORY_MAX_PATH];
 };
 
 int gitt_repository_init(struct gitt_repository *repository);
-int gitt_repository_clone(struct gitt_repository *repository);
 int gitt_repository_push_commit(struct gitt_repository *repository,
-			       struct gitt_commit *commit);
+			       struct gitt_commit *commit,
+			       struct gitt_obj *objs, uint8_t obj_num);
 int gitt_repository_pull(struct gitt_repository *repository);
 int gitt_repository_update_head(struct gitt_repository *repository);
 int gitt_repository_end(struct gitt_repository *repository);

@@ -22,13 +22,31 @@
  * SOFTWARE.
  */
 
+#include <string.h>
+#include <gitt_config.h>
 #include <gitt_pack.h>
 #include <gitt_log.h>
 #include <gitt_errno.h>
 #include <gitt_commit.h>
+#include <gitt_tree.h>
 
 #define GITT_PACK_STATE_INIT		0x00
 #define GITT_PACK_STATE_STOP		0xff
+
+/*
+ * Pack file header (git pack format, fixed):
+ * | 4byte magic "PACK" | 4byte version 2 | 4byte number of objects |
+ */
+#define GITT_PACK_MAGIC		"PACK"
+#define GITT_PACK_MAGIC_SIZE	4
+#define GITT_PACK_VERSION	2
+#define GITT_PACK_HEADER_SIZE	12
+
+/* Minimum user buffer: the pack ends with a 20 byte SHA-1 checksum */
+#define GITT_MIN_BUF_SIZE	20
+
+/* SHA-1 digest size, bytes */
+#define GITT_SHA1_SIZE		20
 
 static int gitt_pack_data_update(struct gitt_pack *pack, uint8_t *buf, uint16_t size)
 {
@@ -51,34 +69,31 @@ int gitt_pack_init(struct gitt_pack *pack)
 {
 	int ret;
 
-	if (!pack->buf || pack->buf_len < 20) {
-		gitt_log_error("Buffe cannot be empty and the length cannot be less than 20\n");
-		return -GITT_ERRNO_NOMEM;
+	if (!pack->buf || pack->buf_len < GITT_MIN_BUF_SIZE) {
+		gitt_log_error("Buffer cannot be empty and the length cannot be less than 20\n");
+		return -GITT_ERRNO_INVAL;
 	}
 
 	gitt_sha1_init(&pack->sha1);
 	pack->state = GITT_PACK_STATE_INIT;
 
 	/* 4byte magic */
-	pack->buf[0] = 'P';
-	pack->buf[1] = 'A';
-	pack->buf[2] = 'C';
-	pack->buf[3] = 'K';
+	memcpy(pack->buf, GITT_PACK_MAGIC, GITT_PACK_MAGIC_SIZE);
 
 	/* 4byte version */
-	pack->buf[4] = 0;
-	pack->buf[5] = 0;
-	pack->buf[6] = 0;
-	pack->buf[7] = 2;
+	pack->buf[GITT_PACK_MAGIC_SIZE] = 0;
+	pack->buf[GITT_PACK_MAGIC_SIZE + 1] = 0;
+	pack->buf[GITT_PACK_MAGIC_SIZE + 2] = 0;
+	pack->buf[GITT_PACK_MAGIC_SIZE + 3] = GITT_PACK_VERSION;
 
-	/* 4byte mumber of objects */
-	pack->buf[8] = 0;
-	pack->buf[9] = 0;
-	pack->buf[10] = 0;
-	pack->buf[11] = pack->obj_num;
+	/* 4byte number of objects */
+	pack->buf[2 * GITT_PACK_MAGIC_SIZE] = 0;
+	pack->buf[2 * GITT_PACK_MAGIC_SIZE + 1] = 0;
+	pack->buf[2 * GITT_PACK_MAGIC_SIZE + 2] = 0;
+	pack->buf[2 * GITT_PACK_MAGIC_SIZE + 3] = pack->obj_num;
 
 	/* Dump */
-	ret = gitt_pack_data_update(pack, pack->buf, 12);
+	ret = gitt_pack_data_update(pack, pack->buf, GITT_PACK_HEADER_SIZE);
 	if (ret)
 		return ret;
 
@@ -112,6 +127,9 @@ int gitt_pack_update(struct gitt_pack *pack, struct gitt_obj *obj)
 	int ret;
 	uint8_t obj_head[3];
 	uint8_t head_len = 0;
+	uint16_t obj_size = obj->size;
+	uint16_t data_size = obj->size;
+	uint16_t out_size;
 
 	if (!pack->obj_num)
 		goto done;
@@ -122,20 +140,20 @@ int gitt_pack_update(struct gitt_pack *pack, struct gitt_obj *obj)
 	}
 
 	obj_head[0] = (obj->type & 0x7) << 4;
-	obj_head[0] |= obj->size & 0xf;
-	obj->size >>= 4;
+	obj_head[0] |= obj_size & 0xf;
+	obj_size >>= 4;
 	head_len++;
 
-	if (obj->size) {
+	if (obj_size) {
 		obj_head[0] |= 0x80;
-		obj_head[1] = obj->size & 0x7f;
+		obj_head[1] = obj_size & 0x7f;
 		head_len++;
-		obj->size >>= 7;
+		obj_size >>= 7;
 	}
 
-	if (obj->size) {
+	if (obj_size) {
 		obj_head[1] |= 0x80;
-		obj_head[2] = obj->size & 0x7f;
+		obj_head[2] = obj_size & 0x7f;
 		head_len++;
 	}
 
@@ -145,21 +163,59 @@ int gitt_pack_update(struct gitt_pack *pack, struct gitt_obj *obj)
 		return ret;
 
 	/* Build object */
-	if (obj->type == GITT_OBJ_TYPE_COMMIT) {
-		ret = gitt_zlib_compress_init(&pack->zlib);
-		if (ret)
-			return ret;
+	ret = gitt_zlib_compress_init(&pack->zlib);
+	if (ret)
+		return ret;
 
+	if (obj->type == GITT_OBJ_TYPE_COMMIT) {
 		ret = gitt_commit_build(gitt_obj_data_dump, pack,
 					(struct gitt_commit *)obj->data);
-		gitt_zlib_compress_end(&pack->zlib);
+	} else if (obj->type == GITT_OBJ_TYPE_TREE) {
+		ret = gitt_tree_build(gitt_obj_data_dump, pack,
+				(struct gitt_tree *)obj->data);
+	} else if (obj->type == GITT_OBJ_TYPE_BLOB) {
+		uint8_t *p = (uint8_t *)obj->data;
+		uint16_t remaining = data_size;
 
-		if (ret)
-			return ret;
+		/*
+		 * Compress the blob content in chunks. A do-while: an
+		 * empty blob still needs the Z_FINISH call to produce
+		 * its (empty) deflate stream.
+		 */
+		do {
+			uint16_t chunk = (remaining > GITT_PACK_BLOB_CHUNK) ?
+						GITT_PACK_BLOB_CHUNK : remaining;
+			uint16_t consumed = chunk;
+			uint8_t *input = p;
+			bool last = (chunk == remaining);
+
+			out_size = pack->buf_len;
+			ret = gitt_zlib_compress_update(&pack->zlib, input, &consumed,
+							pack->buf, &out_size, last);
+			if (ret)
+				break;
+			if (!consumed && !out_size) {
+				gitt_log_error("Compress stuck, buffer too small\n");
+				ret = -GITT_ERRNO_NOMEM;
+				break;
+			}
+			if (out_size) {
+				ret = gitt_pack_data_update(pack, pack->buf, out_size);
+				if (ret)
+					break;
+			}
+			p += consumed;
+			remaining -= consumed;
+		} while (remaining);
 	} else {
 		gitt_log_error("Unsupported object type\n");
-		return -GITT_ERRNO_INVAL;
+		ret = -GITT_ERRNO_INVAL;
 	}
+
+	gitt_zlib_compress_end(&pack->zlib);
+
+	if (ret)
+		return ret;
 
 	pack->state++;
 
@@ -171,7 +227,7 @@ done:
 			return ret;
 
 		if (pack->data_dump) {
-			ret = pack->data_dump(pack, pack->buf, 20);
+			ret = pack->data_dump(pack, pack->buf, GITT_SHA1_SIZE);
 			if (ret)
 				return ret;
 		}

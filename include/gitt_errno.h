@@ -29,7 +29,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-const char *gitt_errno_str(int errno);
+const char *gitt_errno_str(int err);
 
 #define GITT_ERRNO_OK			0
 #define GITT_ERRNO_INVAL		1

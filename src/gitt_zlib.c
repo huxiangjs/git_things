@@ -104,8 +104,8 @@ int gitt_zlib_compress_update(struct gitt_zlib *zlib,
 
 	*in_size -= zlib->stream.avail_in;
 	*out_size -= zlib->stream.avail_out;
-	gitt_log_debug("cost in +%u bytes\n", *in_size);
-	gitt_log_debug("cost out +%u bytes\n", *out_size);
+	gitt_log_debug("consumed %u input bytes\n", *in_size);
+	gitt_log_debug("produced %u output bytes\n", *out_size);
 
 	return 0;
 }
@@ -157,8 +157,8 @@ int gitt_zlib_decompress_update(struct gitt_zlib *zlib,
 
 	*in_size -= zlib->stream.avail_in;
 	*out_size -= zlib->stream.avail_out;
-	gitt_log_debug("cost in +%u bytes\n", *in_size);
-	gitt_log_debug("cost out +%u bytes\n", *out_size);
+	gitt_log_debug("consumed %u input bytes\n", *in_size);
+	gitt_log_debug("produced %u output bytes\n", *out_size);
 
 	return 0;
 }

@@ -25,11 +25,35 @@
 #ifndef __GITT_TREE_H_
 #define __GITT_TREE_H_
 
+#include <stdint.h>
+#include <gitt_config.h>
+#include <gitt_obj.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-#define GITT_TREE_EMPTY_SHA1		"4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+#define GITT_TREE_FILE_MODE		"100644"
+#define GITT_TREE_DIR_MODE		"40000"
+#define GITT_TREE_EXEC_MODE		"100755"
+
+struct gitt_tree_entry {
+	char mode[8];
+	char name[GITT_TREE_NAME_SIZE];
+	char sha1[41];
+};
+
+struct gitt_tree {
+	uint8_t entry_num;
+	char sha1[41];
+	struct gitt_tree_entry entries[GITT_TREE_MAX_ENTRIES];
+};
+
+uint16_t gitt_tree_length(struct gitt_tree *tree);
+int gitt_tree_build(gitt_obj_data dump, void *p, struct gitt_tree *tree);
+int gitt_tree_parse(char *buf, uint16_t size, struct gitt_tree *tree);
+void gitt_tree_sort(struct gitt_tree *tree);
+int gitt_tree_sha1_update(struct gitt_tree *tree);
 
 #ifdef __cplusplus
 }

@@ -28,6 +28,16 @@
 #include <gitt_ssh.h>
 #include <gitt_errno.h>
 
+/* Only ssh on the default port is supported; the https protocol is not */
+#define GITT_SSH_PORT		"22"
+
+/*
+ * The "git-receive-pack '<repository>'" command buffer: the exec
+ * string ("git-receive-pack" / "git-upload-pack"), the repository and
+ * the quoting, derived from the configured repository size
+ */
+#define GITT_SSH_CMD_SIZE	(GITT_SSH_REPOSITORY_SIZE + 32)
+
 /* Please implement the following interfaces according to your system type */
 struct gitt_ssh* gitt_ssh_alloc_impl(void);
 void gitt_ssh_free_impl(struct gitt_ssh *ssh);
@@ -38,47 +48,48 @@ int gitt_ssh_write_impl(struct gitt_ssh *ssh, char *buf, int size);
 void gitt_ssh_disconnect_impl(struct gitt_ssh *ssh);
 
 /**
- * @brief Pad in url information
+ * @brief Parse a ssh url into user/host/port/repository
  *
  * @param ssh_url
  * @param url
  * @return int 0: Good
  * @return int -1: Error
  */
-static int gitt_ssh_url_pad(struct gitt_ssh_url *ssh_url, const char *url)
+static int gitt_ssh_url_parse(struct gitt_ssh_url *ssh_url, const char *url)
 {
 	int i, j;
 
-	/* User */
+	/* User: up to '@' */
 	j = 0;
 	i = 0;
 	while (url[i] && url[i] != '@' && j < sizeof(ssh_url->user))
 		ssh_url->user[j++] = url[i++];
-	if (j == sizeof(ssh_url->user))
+	if (j == sizeof(ssh_url->user) || url[i] != '@')
 		return -GITT_ERRNO_INVAL;
 	ssh_url->user[j] = '\0';
 	i++;
 
-	/* Host */
+	/* Host: up to ':' */
 	j = 0;
 	while (url[i] && url[i] != ':' && j < sizeof(ssh_url->host))
 		ssh_url->host[j++] = url[i++];
-	if (j == sizeof(ssh_url->host))
+	if (j == sizeof(ssh_url->host) || url[i] != ':')
 		return -GITT_ERRNO_INVAL;
 	ssh_url->host[j] = '\0';
 	i++;
 
-	/* Repository */
+	/* Repository: the rest of the url */
+	if (!url[i])
+		return -GITT_ERRNO_INVAL;
 	j = 0;
 	while (url[i] && j < sizeof(ssh_url->repository))
 		ssh_url->repository[j++] = url[i++];
 	if (j == sizeof(ssh_url->repository))
 		return -GITT_ERRNO_INVAL;
 	ssh_url->repository[j] = '\0';
-	i++;
 
 	/* Port: fixed to 22*/
-	strcpy(ssh_url->port, "22");
+	strcpy(ssh_url->port, GITT_SSH_PORT);
 
 	return 0;
 }
@@ -111,12 +122,12 @@ int gitt_ssh_connect(struct gitt_ssh *ssh, const char *url, const char *exec,
 {
 	struct gitt_ssh_url ssh_url;
 	int err;
-	char buffer[96];
+	char buffer[GITT_SSH_CMD_SIZE];
 
 	if (!ssh || !url || !exec || !privkey)
 		return -GITT_ERRNO_INVAL;
 
-	err = gitt_ssh_url_pad(&ssh_url, url);
+	err = gitt_ssh_url_parse(&ssh_url, url);
 	if (err)
 		return err;
 	gitt_log_debug("User: %s\n", ssh_url.user);
