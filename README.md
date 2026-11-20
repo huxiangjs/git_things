@@ -21,6 +21,7 @@ So let's forget about other servers and let's have fun! :)
 * **Every commit carries a real file tree.** Each push parents the new commit on the remote head, so the history stays intact (`git log` works as usual).
 * Only the git (ssh) protocol is supported; the https protocol is not supported.
 * The device side is stateless: it keeps no objects between sessions, so every pull is a fresh snapshot of the tip tree (depth 1).
+* **Every transfer is a full snapshot, never incremental.** A push uploads every file in full — the server deduplicates by SHA-1, so unchanged files cost bandwidth but no storage. A pull downloads the entire tip tree, including files that did not change (a stateless client cannot do incremental fetches).
 * Limits: see the Limits section below. The tunable limits and defaults are the macros of the global config `<gitt_config.h>` that the core includes — [examples/gitt_config.h](examples/gitt_config.h) is the reference config, and a port provides its own.
 
 ## :package: What it can do
