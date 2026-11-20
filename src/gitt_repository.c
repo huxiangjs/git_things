@@ -22,27 +22,239 @@
  * SOFTWARE.
  */
 
+#include <stdio.h>
 #include <string.h>
 #include <gitt_type.h>
 #include <gitt_log.h>
+#include <gitt_tree.h>
 #include <gitt_command.h>
 #include <gitt_repository.h>
 #include <gitt_errno.h>
 
+/*
+ * The file registry (path <-> SHA-1) helpers
+ */
+
+static int gitt_repository_file_add(struct gitt_repository *repository,
+				    const char *path, const char *sha1)
+{
+	struct gitt_repository_file *file;
+
+	if (repository->file_num >= GITT_REPOSITORY_MAX_FILES) {
+		gitt_log_error("File registry is full\n");
+		return -GITT_ERRNO_INVAL;
+	}
+
+	file = &repository->files[repository->file_num++];
+	if (strlen(path) + 1 > sizeof(file->path)) {
+		gitt_log_error("File path is too long: %s\n", path);
+		return -GITT_ERRNO_INVAL;
+	}
+	strcpy(file->path, path);
+	strcpy(file->sha1, sha1);
+	gitt_log_debug("File registered: %s\n", path);
+	return 0;
+}
+
+static int gitt_repository_tree_add(struct gitt_repository *repository,
+				    const char *sha1, const char *path)
+{
+	uint8_t i;
+
+	if (repository->tree_num >= GITT_REPOSITORY_MAX_TREES) {
+		gitt_log_error("Tree registry is full\n");
+		return -GITT_ERRNO_INVAL;
+	}
+	if (strlen(path) + 1 > sizeof(repository->tree_path[0])) {
+		gitt_log_error("Tree path is too long: %s\n", path);
+		return -GITT_ERRNO_INVAL;
+	}
+	i = repository->tree_num++;
+	strcpy(repository->tree_sha1[i], sha1);
+	strcpy(repository->tree_path[i], path);
+	gitt_log_debug("Tree registered: %s (%s)\n", path, sha1);
+	return 0;
+}
+
 static void gitt_obj_dump_callback(struct gitt_obj *obj)
 {
-	int ret;
-	struct gitt_commit commit;
+	struct gitt_commit commit = {0};
 	struct gitt_unpack *unpack = gitt_containerof(obj, struct gitt_unpack, obj);
 	struct gitt_repository *repository = gitt_containerof(unpack, struct gitt_repository, unpack);
+	int ret;
 
-	if (obj->type == GITT_OBJ_TYPE_COMMIT && repository->commit_dump) {
-		ret = gitt_commit_parse(obj->data, obj->size, &commit);
-		if (!ret)
-			repository->commit_dump(repository, &commit);
-	} else {
-		gitt_log_info("Skip type:%s, size:%d\n", GITT_OBJ_STR(obj->type), obj->size);
+	if (obj->type != GITT_OBJ_TYPE_COMMIT)
+		/* Trees and blobs are handled in gitt_repository_checkout() */
+		return;
+
+	ret = gitt_commit_parse(obj->data, (uint16_t)obj->size, &commit);
+	if (ret)
+		return;
+
+	repository->commit_dump(repository, &commit);
+
+	/*
+	 * Remember the root tree of the tip commit only. The pack can
+	 * contain other commits (the parent in a shallow fetch, older
+	 * history in a full fetch) and none of them must overwrite the
+	 * tree of the tip.
+	 */
+	if (!strcmp(obj->sha1, repository->head)) {
+		if (strlen(commit.tree.sha1))
+			strcpy(repository->root_tree_sha1, commit.tree.sha1);
 	}
+}
+
+/*
+ * Restore the file tree from the object store
+ *
+ * Runs after the whole pack has been received: the pack order does not
+ * guarantee that a tree comes before the blobs it references, so the
+ * tree is walked from the object store (which holds every received
+ * object), not while streaming.
+ */
+
+static void gitt_repository_sha_to_hex(const uint8_t sha1[20], char hex[41])
+{
+	static const char *tables = "0123456789abcdef";
+	uint8_t i;
+
+	for (i = 0; i < 20; i++) {
+		hex[i * 2] = tables[sha1[i] >> 4];
+		hex[i * 2 + 1] = tables[sha1[i] & 0xf];
+	}
+	hex[40] = '\0';
+}
+
+static struct gitt_unpack_obj_entry *gitt_repository_store_find(struct gitt_repository *repository,
+								uint8_t type, const char *sha1_hex)
+{
+	char hex[41];
+	uint8_t i;
+
+	for (i = 0; i < repository->unpack.store_num; i++) {
+		if (repository->unpack.store[i].type != type)
+			continue;
+		gitt_repository_sha_to_hex(repository->unpack.store[i].sha1, hex);
+		if (!strcmp(hex, sha1_hex))
+			return &repository->unpack.store[i];
+	}
+
+	return NULL;
+}
+
+static int gitt_repository_tree_walk(struct gitt_repository *repository,
+				     const char *path, const char *tree_sha1)
+{
+	struct gitt_unpack_obj_entry *entry;
+	struct gitt_tree tree;
+	char fullpath[GITT_REPOSITORY_MAX_PATH];
+	uint8_t i;
+	int ret;
+
+	entry = gitt_repository_store_find(repository, GITT_OBJ_TYPE_TREE, tree_sha1);
+	if (!entry) {
+		gitt_log_error("Missing tree object: %s\n", tree_sha1);
+		return -GITT_ERRNO_INVAL;
+	}
+
+	ret = gitt_tree_parse((char *)entry->data, (uint16_t)entry->size, &tree);
+	if (ret) {
+		gitt_log_error("Parse tree fail\n");
+		return ret;
+	}
+
+	for (i = 0; i < tree.entry_num; i++) {
+		ret = snprintf(fullpath, sizeof(fullpath),
+			       "%s%s%s", path,
+			       path[0] ? "/" : "", tree.entries[i].name);
+
+		if (ret <= 0 || ret >= sizeof(fullpath)) {
+			gitt_log_error("File path is too long\n");
+			return -GITT_ERRNO_INVAL;
+		}
+
+		if (!strcmp(tree.entries[i].mode, GITT_TREE_DIR_MODE)) {
+			ret = gitt_repository_tree_add(repository,
+					tree.entries[i].sha1, fullpath);
+			if (ret)
+				return ret;
+			ret = gitt_repository_tree_walk(repository, fullpath,
+							tree.entries[i].sha1);
+			if (ret)
+				return ret;
+		} else {
+			ret = gitt_repository_file_add(repository,
+					fullpath, tree.entries[i].sha1);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
+static int gitt_repository_checkout(struct gitt_repository *repository)
+{
+	struct gitt_commit commit = {0};
+	char hex[41];
+	uint8_t i;
+	int ret;
+
+	/* The registry describes the tree of the current head: rebuild it */
+	repository->file_num = 0;
+	repository->tree_num = 0;
+
+	/* Find the tip commit in the store */
+	for (i = 0; i < repository->unpack.store_num; i++) {
+		if (repository->unpack.store[i].type != GITT_OBJ_TYPE_COMMIT)
+			continue;
+		gitt_repository_sha_to_hex(repository->unpack.store[i].sha1, hex);
+		if (strcmp(hex, repository->head))
+			continue;
+
+		ret = gitt_commit_parse((char *)repository->unpack.store[i].data,
+					(uint16_t)repository->unpack.store[i].size,
+					&commit);
+		if (ret) {
+			gitt_log_error("Parse commit fail\n");
+			return ret;
+		}
+
+		if (!strlen(commit.tree.sha1)) {
+			gitt_log_error("Commit has no tree\n");
+			return -GITT_ERRNO_INVAL;
+		}
+
+		/* Walk the root tree and collect every file */
+		ret = gitt_repository_tree_walk(repository, "", commit.tree.sha1);
+		if (ret)
+			return ret;
+
+		break;
+	}
+	if (i == repository->unpack.store_num) {
+		gitt_log_error("Tip commit not found in the pack\n");
+		return -GITT_ERRNO_INVAL;
+	}
+
+	/* Write out every blob */
+	for (i = 0; i < repository->file_num; i++) {
+		struct gitt_unpack_obj_entry *entry;
+
+		entry = gitt_repository_store_find(repository, GITT_OBJ_TYPE_BLOB,
+						   repository->files[i].sha1);
+		if (!entry) {
+			gitt_log_error("Missing blob: %s\n",
+				       repository->files[i].sha1);
+			return -GITT_ERRNO_INVAL;
+		}
+		if (repository->blob_dump)
+			repository->blob_dump(repository, repository->files[i].path,
+					      (uint8_t *)entry->data, entry->size);
+	}
+
+	return 0;
 }
 
 static int gitt_command_pack_dump_callback(void *param, char *data, int size)
@@ -84,12 +296,17 @@ int gitt_repository_init(struct gitt_repository *repository)
 	}
 
 	if (!repository->buf || repository->buf_len < 20) {
-		gitt_log_error("Buffe cannot be empty and the length cannot be less than 20\n");
+		gitt_log_error("Buffer cannot be empty and the length cannot be less than 20\n");
 		return -GITT_ERRNO_INVAL;
 	}
 
 	repository->head[0] = '\0';
 	repository->ssh = NULL;
+	repository->shallow = 0;
+	repository->files_loaded = 0;
+	repository->root_tree_sha1[0] = '\0';
+	repository->file_num = 0;
+	repository->tree_num = 0;
 
 	return 0;
 }
@@ -115,12 +332,27 @@ static int gitt_pack_data_dump_callback(void *p, uint8_t *buf, uint16_t size)
 	return gitt_command_write_pack(repository->ssh, buf, size);
 }
 
-int gitt_repository_push_commit(struct gitt_repository *repository, struct gitt_commit *commit)
+/**
+ * @brief Push commit (with the tree and blob objects)
+ *
+ * @param repository
+ * @param commit the new commit (its id must be up to date)
+ * @param objs the objects to push: all trees and blobs, the commit object
+ *        must be the last one
+ * @param obj_num number of objects
+ * @return int 0: Good
+ * @return int -1: Error
+ */
+int gitt_repository_push_commit(struct gitt_repository *repository,
+				struct gitt_commit *commit,
+				struct gitt_obj *objs, uint8_t obj_num)
 {
 	int ret;
-	struct gitt_obj obj;
+	uint8_t i;
 	char remote_head[41];
 	char refs[32];
+	char parent[41];
+	int auto_base = 0;
 
 	gitt_log_debug("Start connecting\n");
 	repository->ssh = gitt_command_start_receive(repository->url, repository->privkey);
@@ -132,9 +364,32 @@ int gitt_repository_push_commit(struct gitt_repository *repository, struct gitt_
 	if (ret)
 		goto err0;
 
-	/* Auto base */
-	if (commit->parent.sha1 && !strcmp(commit->parent.sha1, GITT_COMMIT_AUTO_BASE))
-		commit->parent.sha1 = remote_head;
+	/*
+	 * A 40-zero head (git-receive-pack's way of advertising an empty
+	 * repository) means there is no head yet.
+	 */
+	{
+		int zero = 1;
+		for (i = 0; i < 40; i++)
+			if (remote_head[i] != '0') {
+				zero = 0;
+				break;
+			}
+		if (zero && strlen(remote_head) == 40)
+			remote_head[0] = '\0';
+	}
+
+	/*
+	 * Auto base: resolve to the current remote head. The resolved
+	 * value is kept in this function's buffer and the AUTO_BASE
+	 * marker is restored before returning, so a retry (after the
+	 * remote head has moved) is resolved against the new head.
+	 */
+	if (commit->parent.sha1 && !strcmp(commit->parent.sha1, GITT_COMMIT_AUTO_BASE)) {
+		auto_base = 1;
+		strcpy(parent, remote_head);
+		commit->parent.sha1 = parent;
+	}
 
 	/* Check parent */
 	if (commit->parent.sha1 && strlen(commit->parent.sha1) &&
@@ -151,32 +406,51 @@ int gitt_repository_push_commit(struct gitt_repository *repository, struct gitt_
 		goto err0;
 	}
 
-	gitt_log_debug("Set pack\n");
-	ret = gitt_command_set_pack(repository->ssh, remote_head, commit->id.sha1,
-				    strlen(refs) ? refs : repository->refs);
-	if (ret)
-		goto err0;
+	/*
+	 * Resolving the auto base may have changed the parent line,
+	 * which changes the length of the commit object.
+	 */
+	objs[obj_num - 1].size = gitt_commit_length(commit);
+
+	/*
+	 * Choose the ref to update. When the remote has no refs yet,
+	 * this creates a new branch (the old id is 40 zeros).
+	 */
+	{
+		static const char zero_id[41] = "0000000000000000000000000000000000000000";
+		const char *old_id = strlen(remote_head) ? remote_head : zero_id;
+		const char *ref = strlen(refs) ? refs :
+			(strlen(repository->refs) ? repository->refs :
+				"refs/heads/master");
+
+		gitt_log_debug("Set pack\n");
+		ret = gitt_command_set_pack(repository->ssh, old_id, commit->id.sha1,
+					    ref);
+		if (ret)
+			goto err0;
+	}
 
 	/* Initialize header */
 	repository->pack.buf = repository->buf;
 	repository->pack.buf_len = repository->buf_len;
-	repository->pack.obj_num = 1;
+	repository->pack.obj_num = obj_num;
 	repository->pack.data_dump = gitt_pack_data_dump_callback;
 	ret = gitt_pack_init(&repository->pack);
 	if (ret)
 		goto err0;
 
 	/* Update to pack */
-	obj.type = GITT_OBJ_TYPE_COMMIT;
-	obj.data = commit;
-	obj.size = gitt_commit_length(commit);
-	ret = gitt_pack_update(&repository->pack, &obj);
-	if (ret)
-		goto err1;
+	for (i = 0; i < obj_num; i++) {
+		gitt_log_debug("Pack object %u: %s\n", i,
+			       GITT_OBJ_STR(objs[i].type));
+		ret = gitt_pack_update(&repository->pack, &objs[i]);
+		if (ret)
+			goto err1;
+	}
 
 	gitt_pack_end(&repository->pack);
 
-	ret = gitt_command_get_state(repository->ssh);
+	ret = gitt_command_get_push_status(repository->ssh);
 	if (ret)
 		goto err0;
 
@@ -186,13 +460,21 @@ int gitt_repository_push_commit(struct gitt_repository *repository, struct gitt_
 	memcpy(repository->head, commit->id.sha1, sizeof(commit->id.sha1));
 	if (strlen(refs))
 		strcpy(repository->refs, refs);
+	else if (!strlen(repository->refs))
+		/* A new ref was created */
+		strcpy(repository->refs, "refs/heads/master");
 	gitt_log_debug("Head updated: %s\n", repository->head);
+
+	if (auto_base)
+		commit->parent.sha1 = GITT_COMMIT_AUTO_BASE;
 
 	return 0;
 
 err1:
 	gitt_pack_end(&repository->pack);
 err0:
+	if (auto_base)
+		commit->parent.sha1 = GITT_COMMIT_AUTO_BASE;
 	gitt_command_end(repository->ssh);
 	return ret;
 }
@@ -206,7 +488,11 @@ err0:
  */
 int gitt_repository_pull(struct gitt_repository *repository)
 {
-	int ret;
+	/*
+	 * Default error for the paths below that only know that
+	 * "something went wrong"; every checked call overwrites it.
+	 */
+	int ret = -GITT_ERRNO_INVAL;
 	char remote_head[41];
 	char refs[32];
 
@@ -220,23 +506,43 @@ int gitt_repository_pull(struct gitt_repository *repository)
 	if (ret)
 		goto err0;
 
-	/* Clone || Pull */
-	if (!strlen(repository->head)) {
-		gitt_log_debug("Start clone\n");
+	/* The remote repository is empty: nothing to fetch */
+	if (!strlen(remote_head)) {
+		gitt_log_debug("Remote repository is empty\n");
 
-		ret = gitt_command_want(repository->ssh, remote_head, NULL);
+		ret = gitt_command_say_byebye(repository->ssh);
 		if (ret)
 			goto err0;
 
-		/* Update head */
-		memcpy(repository->head, remote_head, sizeof(remote_head));
-		if (strlen(refs))
-			strcpy(repository->refs, refs);
-		gitt_log_debug("Head updated: %s\n", repository->head);
-	} else if (memcmp(repository->head, remote_head, sizeof(remote_head))) {
-		gitt_log_debug("Start pull\n");
+		gitt_command_end(repository->ssh);
+		return 0;
+	}
 
-		ret = gitt_command_want(repository->ssh, remote_head, repository->head);
+	/*
+	 * Clone || Pull. A fetch is needed when:
+	 * - there is no local head yet (clone)
+	 * - the pull is shallow (a fresh snapshot is always wanted)
+	 * - the head is known but its files were never fetched in this
+	 *   session (e.g. only 'update_head' ran, as during init)
+	 * - the remote head has advanced
+	 */
+	if (!strlen(repository->head) ||
+	    repository->shallow ||
+	    !repository->files_loaded ||
+	    memcmp(repository->head, remote_head, sizeof(remote_head))) {
+		gitt_log_debug("Start %s\n",
+			       !strlen(repository->head) ? "clone" : "pull");
+
+		/*
+		 * The MCU is stateless: it keeps no objects between pulls,
+		 * so 'have' is never sent. Every fetch is a fresh snapshot
+		 * of the tip tree (an incremental pack would be missing the
+		 * blobs of the unchanged files). Shallow fetches are
+		 * repeated even when the local head already matches,
+		 * because the files themselves are not kept.
+		 */
+		ret = gitt_command_want(repository->ssh, remote_head, NULL,
+					repository->shallow ? 1 : 0);
 		if (ret)
 			goto err0;
 
@@ -272,26 +578,35 @@ int gitt_repository_pull(struct gitt_repository *repository)
 	if (ret)
 		goto err1;
 
+	/* Restore the file tree from the received objects */
+	gitt_log_debug("Checkout\n");
+	ret = gitt_repository_checkout(repository);
+	if (ret)
+		goto err1;
+
+	repository->files_loaded = 1;
+	gitt_unpack_store_clear(&repository->unpack);
 	gitt_unpack_end(&repository->unpack);
 	gitt_command_end(repository->ssh);
 
 	return 0;
 
 err1:
+	gitt_unpack_store_clear(&repository->unpack);
 	gitt_unpack_end(&repository->unpack);
 err0:
 	gitt_command_end(repository->ssh);
-	return -GITT_ERRNO_INVAL;
+	return ret;
 }
 
 int gitt_repository_update_head(struct gitt_repository *repository)
 {
 	struct gitt_ssh* ssh;
-	int ret;
+	int ret = -GITT_ERRNO_INVAL;
 
 	ssh = gitt_command_start_upload(repository->url, repository->privkey);
 	if (!ssh)
-		return -GITT_ERRNO_INVAL;
+		return ret;
 
 	ret = gitt_command_get_head(ssh, repository->head, repository->refs);
 	if (ret)
@@ -304,14 +619,15 @@ int gitt_repository_update_head(struct gitt_repository *repository)
 	gitt_command_end(ssh);
 	gitt_log_debug("Head updated: %s\n", repository->head);
 
-	if (!strlen(repository->refs))
-		return -GITT_ERRNO_INVAL;
-
+	/*
+	 * An empty head and refs mean the remote repository has no
+	 * commits yet, which is a valid state (first push).
+	 */
 	return 0;
 
 err:
 	gitt_command_end(ssh);
-	return -GITT_ERRNO_INVAL;
+	return ret;
 }
 
 int gitt_repository_end(struct gitt_repository *repository)

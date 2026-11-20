@@ -25,6 +25,7 @@
 #ifndef __GITT_H_
 #define __GITT_H_
 
+#include <stdint.h>
 #include <gitt_repository.h>
 #include <gitt_device.h>
 
@@ -41,21 +42,40 @@ typedef int (*gitt_get_zone)(char *buf, uint8_t size);
 typedef void (*gitt_remote_event)(struct gitt *g, struct gitt_device *device,
 				 char *date, char *zone, char *event);
 
+/*
+ * One file to be backed up (push) or restored (pull)
+ */
+#define GITT_FILE_PATH_SIZE		64
+#define GITT_MAX_FILES			16
+
+struct gitt_file {
+	char path[GITT_FILE_PATH_SIZE];
+	uint8_t *data;
+	uint16_t size;
+};
+
+typedef void (*gitt_file_dump)(struct gitt *g, char *path,
+			       uint8_t *data, uint32_t size);
+
 struct gitt {
 	struct gitt_device device;
 	struct gitt_repository repository;
 	gitt_get_date get_date;
 	gitt_get_zone get_zone;
 	gitt_remote_event remote_event;
+	gitt_file_dump file_dump;
 	char *url;
 	char *privkey;
 	uint8_t *buf;
 	uint16_t buf_len;
+	uint8_t shallow;
 };
 
 int gitt_init(struct gitt *g);
-int gitt_update_event(struct gitt *g);
-int gitt_commit_event(struct gitt *g, char *data);
+int gitt_pull(struct gitt *g);
+int gitt_push(struct gitt *g, char *message);
+int gitt_commit_files(struct gitt *g, struct gitt_file *files,
+		      uint8_t file_num, char *message);
 int gitt_history(struct gitt *g);
 void gitt_end(struct gitt *g);
 char *gitt_version(void);

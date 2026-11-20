@@ -56,15 +56,19 @@
          init:  init [repository] <privkey>  -- Initialize GITT
          exit:  exit                        -- Exit GITT
       history:  history                     -- View historical events
-       commit:  commit [event]              -- Commit a event
+       commit:  commit [event]              -- Commit an event (push)
          loop:  loop <time>                 -- Loop to get events
+     pushfile:  pushfile <dir> [msg]        -- Back up files of a directory
+     pullfile:  pullfile [dir] [full]       -- Restore the latest file snapshot
+      shallow:  shallow <on/off>            -- Enable/disable shallow pull
          help:  help                        -- Show help
      GITT# init git@github.com:huxiangjs/gitt_example.git
      Repository URL: git@github.com:huxiangjs/gitt_example.git
      Privkey path: /home/huxiang/.ssh/id_ed25519
      Private key loading completed
 
-     !! Warning: The following repository will be formatted and all data will    be   lost.
+     !! Note: Initializing will connect to the repository below and
+     sync the remote head. The remote data will not be modified.
      Repository: git@github.com:huxiangjs/gitt_example.git
      Please confirm whether to continue? (no/yes): yes
 
@@ -89,15 +93,19 @@
          init:  init [repository] <privkey>  -- Initialize GITT
          exit:  exit                        -- Exit GITT
       history:  history                     -- View historical events
-       commit:  commit [event]              -- Commit a event
+       commit:  commit [event]              -- Commit an event (push)
          loop:  loop <time>                 -- Loop to get events
+     pushfile:  pushfile <dir> [msg]        -- Back up files of a directory
+     pullfile:  pullfile [dir] [full]       -- Restore the latest file snapshot
+      shallow:  shallow <on/off>            -- Enable/disable shallow pull
          help:  help                        -- Show help
      GITT# init git@github.com:huxiangjs/gitt_example.git
      Repository URL: git@github.com:huxiangjs/gitt_example.git
      Privkey path: /home/huxiang/.ssh/id_ed25519
      Private key loading completed
 
-     !! Warning: The following repository will be formatted and all data will be      lost.
+     !! Note: Initializing will connect to the repository below and
+     sync the remote head. The remote data will not be modified.
      Repository: git@github.com:huxiangjs/gitt_example.git
      Please confirm whether to continue? (no/yes): yes
 
@@ -117,4 +125,22 @@
   4. 在接收端，你将会看到如下日志：
      ```shell
      Example Device <0000000000000000> 1701617598 +0800:   This is test event!!
+     ```
+
+* 文件备份 / 恢复
+  1. 发送端把本地目录备份到仓库：
+     ```shell
+     GITT# pushfile ./my_dir "backup of my_dir"
+     Please wait...
+     Push file result: Successful
+     ```
+  2. 接收端把最新快照恢复到本地目录：
+     ```shell
+     GITT# pullfile ./restored
+     Please wait...
+     Pull file result: Successful (files in ./restored)
+     ```
+     `pullfile` 默认是 shallow 拉取（只要最新快照）；传 `full` 则拉取全部历史：
+     ```shell
+     GITT# pullfile ./restored full
      ```

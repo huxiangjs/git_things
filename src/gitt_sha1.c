@@ -136,7 +136,7 @@ static void gitt_sha1_proc_block(struct gitt_sha1 *handle)
 int gitt_sha1_update(struct gitt_sha1 *handle, uint8_t *data, uint32_t size)
 {
 	if (!size)
-		return -GITT_ERRNO_INVAL;
+		return 0;	/* A zero-length update is a no-op */
 
 	if (handle->computed || handle->corrupted) {
 		handle->corrupted = 1;

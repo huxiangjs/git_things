@@ -26,7 +26,21 @@
 #include <string.h>
 #include <gitt_sha1.h>
 
-static void test_for_string(void)
+/*
+ * Reference values, computed with python3 (see tools/python/refs_sha1.py):
+ *
+ *   import hashlib
+ *   hashlib.sha1(b'This is a string for testing!').hexdigest()
+ *
+ *   sha1 = hashlib.sha1()
+ *   for item in range(0, 256):
+ *       sha1.update(bytearray(range(item+1)))
+ *   sha1.hexdigest()
+ */
+#define REF_SHA1_STR	"ac56d9346cb1f8950d141426c5cf4f63749e18fb"
+#define REF_SHA1_BIN	"059217ea0faca8c1c25aa6849b9c37a5ee367998"
+
+static int test_for_string(void)
 {
 	const char *str = "This is a string for testing!";
 	char hexdigest[41];
@@ -36,17 +50,23 @@ static void test_for_string(void)
 	gitt_sha1_init(&sha1);
 
 	err = gitt_sha1_update(&sha1, (uint8_t *)str, (uint32_t)strlen(str));
-	if (err)
+	if (err) {
 		printf("ERROR: %d\n", __LINE__);
+		return -1;
+	}
 
 	err = gitt_sha1_hexdigest(&sha1, hexdigest);
-	if (err)
+	if (err) {
 		printf("ERROR: %d\n", __LINE__);
+		return -1;
+	}
 
-	printf("STR SHA1: %s\n", hexdigest);
+	printf("STR SHA1: %s (ref: %s)\n", hexdigest, REF_SHA1_STR);
+
+	return !strcmp(hexdigest, REF_SHA1_STR);
 }
 
-static void test_for_binary(void)
+static int test_for_binary(void)
 {
 	uint8_t buffer[256] = {0};
 	char hexdigest[41];
@@ -59,21 +79,29 @@ static void test_for_binary(void)
 	for (i = 0; i < 256; i++) {
 		buffer[i] = (uint8_t)i;
 		err = gitt_sha1_update(&sha1, buffer, (uint32_t)i + 1);
-		if (err)
+		if (err) {
 			printf("ERROR: %d\n", __LINE__);
+			return -1;
+		}
 	}
 
 	err = gitt_sha1_hexdigest(&sha1, hexdigest);
-	if (err)
+	if (err) {
 		printf("ERROR: %d\n", __LINE__);
+		return -1;
+	}
 
-	printf("BIN SHA1: %s\n", hexdigest);
+	printf("BIN SHA1: %s (ref: %s)\n", hexdigest, REF_SHA1_BIN);
+
+	return !strcmp(hexdigest, REF_SHA1_BIN);
 }
 
 int main(int args, char *argv[])
 {
-	test_for_string();
-	test_for_binary();
+	int ret = test_for_string();
+	int ret2 = test_for_binary();
 
-	return 0;
+	printf("%s\n", (ret && ret2) ? "Test pass" : "Test FAIL");
+
+	return (ret && ret2) ? 0 : 1;
 }

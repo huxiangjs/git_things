@@ -23,21 +23,16 @@
  */
 
 #include <stdio.h>
-#include <gitt_ssh.h>
 #include <gitt_unpack.h>
 #include <gitt_errno.h>
 
 #define PACK_PATH	"pack-test.pack"
 
+static int gitt_verify_failed;
+
 static void gitt_unpack_obj_callback(struct gitt_obj *obj)
 {
-#if 0
-	printf("%s: type:%s, size:%d\n", __func__, GITT_OBJ_STR(obj->type), obj->size);
-	if (obj->type == 1 || obj->type == 2)
-		printf("%.*s\n", obj->size, (char *)obj->data);
-#else
 	printf("*");
-#endif
 }
 
 static void gitt_unpack_header_callback(uint32_t *version, uint32_t *number)
@@ -50,6 +45,9 @@ static void gitt_unpack_verify_callback(bool pass, struct gitt_sha1 *sha1)
 	char sha1_hex[41];
 	int ret;
 
+	if (!pass)
+		gitt_verify_failed = 1;
+
 	printf(" verify %s, ", pass ? "pass" : "not pass");
 
 	ret = gitt_sha1_hexdigest(sha1, sha1_hex);
@@ -57,7 +55,7 @@ static void gitt_unpack_verify_callback(bool pass, struct gitt_sha1 *sha1)
 		printf("SHA-1: %s\n", sha1_hex);
 }
 
-static void test_unpack(uint8_t *buf, uint16_t len)
+static int test_unpack(uint8_t *buf, uint16_t len)
 {
 	struct gitt_unpack unpack = {0};
 	uint8_t buffer[4096*2];
@@ -68,7 +66,7 @@ static void test_unpack(uint8_t *buf, uint16_t len)
 
 	blk_size = 1;
 	while (blk_size <= len) {
-		printf("[%8d] ", blk_size);
+		printf("[%8u] ", blk_size);
 
 		unpack.buf = buffer;
 		unpack.buf_len = sizeof(buffer);
@@ -76,8 +74,10 @@ static void test_unpack(uint8_t *buf, uint16_t len)
 		unpack.obj_dump = gitt_unpack_obj_callback;
 		unpack.verify_dump = gitt_unpack_verify_callback;
 		err = gitt_unpack_init(&unpack);
-		if (err)
-			break;
+		if (err) {
+			fprintf(stderr, "Test fail (init): %d\n", err);
+			return 1;
+		}
 
 		count = 0;
 		while (count < len) {
@@ -85,17 +85,21 @@ static void test_unpack(uint8_t *buf, uint16_t len)
 			need_size = need_size < blk_size ? need_size : blk_size;
 			err = gitt_unpack_update(&unpack, buf + count, need_size);
 			if (err) {
-				fprintf(stderr, "Test fail: %d\n", err);
-				break;
+				fprintf(stderr, "Test fail (update): %d\n", err);
+				return 1;
 			}
 			count += need_size;
 		}
 
 		gitt_unpack_end(&unpack);
+		/* Free the objects kept in the store (delta bases) */
+		gitt_unpack_store_clear(&unpack);
+
 		blk_size++;
 	}
 
 	printf("Test end\n");
+	return gitt_verify_failed;
 }
 
 static int test_unpack_from_file(void)
@@ -106,24 +110,23 @@ static int test_unpack_from_file(void)
 
 	file = fopen(PACK_PATH, "rb");
 	if (!file) {
-		fprintf(stderr, "Error opening file\n");
-		return -1;
+		fprintf(stderr, "Error opening file %s (run test_pack first)\n",
+			PACK_PATH);
+		return 1;
 	}
 	ret = fread(buffer, 1, sizeof(buffer) - 1, file);
 	if (ret <= 0) {
+		fprintf(stderr, "Error reading file\n");
 		fclose(file);
-		return -1;
+		return 1;
 	}
 	printf("File size: %dbyte\n", ret);
+	fclose(file);
 
-	test_unpack(buffer, (uint16_t)ret);
-
-	return 0;
+	return test_unpack(buffer, (uint16_t)ret);
 }
 
 int main(int args, char *argv[])
 {
-	test_unpack_from_file();
-
-	return 0;
+	return test_unpack_from_file();
 }

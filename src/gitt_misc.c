@@ -42,14 +42,15 @@ const char *gitt_errno_types[ERRNO_STR_MAX] = {
 	"Please try again"
 };
 
-void gitt_null(const char *fmt, ...)
+/* No-op variadic function: the debug log sink when DEBUG is off */
+void gitt_log_null(const char *fmt, ...)
 {
 }
 
-const char *gitt_errno_str(int errno)
+const char *gitt_errno_str(int err)
 {
-	if (-errno >= 0 && -errno < ERRNO_STR_MAX)
-		return gitt_errno_types[-errno];
+	if (-err >= 0 && -err < ERRNO_STR_MAX)
+		return gitt_errno_types[-err];
 
 	return "Unknown error";
 }
