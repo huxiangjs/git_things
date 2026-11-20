@@ -32,3 +32,29 @@ jobs:
       run: |
         cd examples/
         make
+
+    # The round-trip test needs the system sshd on port 22
+    - name: Ensure sshd is running
+      run: sudo service ssh status || sudo service ssh start
+
+    # The round-trip test logs in to localhost with a key; generate
+    # one and authorize it for the runner user
+    - name: Set up an SSH key for the round-trip test
+      run: |
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+        ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
+        cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys
+
+    # Unit tests: sha1, zlib, pack, unpack
+    - name: Run unit tests
+      run: |
+        cd tools/
+        make test
+
+    # Full push/pull round-trip against the local sshd (the
+    # repository is cross-checked with git fsck / git clone)
+    - name: Run the round-trip test
+      run: |
+        cd tools/
+        make test-files
