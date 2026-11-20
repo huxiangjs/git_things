@@ -2,9 +2,9 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
-Git Things 是一个用纯 C 语言实现的库，下文简称为 GITT。它最初是为了实现无云服务的 IoT 设备连接而开发的。它可以将操作端发出的指令转换为 git commit，然后设备端拉取仓库来执行控制操作。使用本库后，你不再需要花费时间和金钱去维护自己的云服务器，可以直接使用 GitHub 作为数据交换服务器。
+Git Things 是一个用纯 C 语言实现的库，下文简称为 GITT。它最初是为了实现无云服务的 IoT 设备连接而开发的。操作端把文件（即对设备的指令）推送到 git 仓库，设备端定期拉取仓库得到最新的文件快照。使用本库后，你不再需要花费时间和金钱去维护自己的云服务器，可以直接使用 GitHub 作为数据交换服务器。
 
-除了记录事件，GITT 还能把设备上的文件以真实的 git 对象（blob / tree / commit）形式备份到仓库，之后再拉取恢复——结果可以直接用普通的 `git clone` / `git fsck` 校验。
+每个文件都存储为真实的 git 对象（blob / tree / commit），因此仓库可以直接用普通的 `git clone` / `git fsck` 校验。
 
 那么，忘掉其他服务器，来享受乐趣吧！
 
@@ -20,24 +20,21 @@ Git Things 是一个用纯 C 语言实现的库，下文简称为 GITT。它最�
 * 内存占用极小：协议核心不做动态分配；一次拉取最多在内存中保留 64 个接收到的对象，`gitt_commit_files()` 只用一个很小的树池（最多 8 棵树）。
 
 ## :zap: 注意事项（非常重要）
-* **纯消息提交会成为分支的新根节点。** `gitt_push()` 创建的提交没有 parent，因此旧的历史会变成 dangling commit，从 HEAD 看 `git log` 只显示最新的那一个。不要把 GITT 指向一个必须完整保留 `git log` 历史的仓库。（`gitt_commit_files()` 会保留历史：它的 parent 是远端 head。）
+* **每个提交都携带真实的文件树。** 每次 push 都把新提交的 parent 设为远端 head，因此历史是完整的（`git log` 一切正常）。
 * 目前仅支持 git（ssh）协议，不支持 https 协议。
-* 设备端是无状态的：会话之间不保留任何对象，因此每次拉取都是 tip 树的一份全新快照。
+* 设备端是无状态的：会话之间不保留任何对象，因此每次拉取都是 tip 树的一份全新快照（depth 1）。
 * 限制：见下文"限制（移植）"一节。可配置的限制与默认值是 core 所 include 的全局配置 `<gitt_config.h>` 的宏——[examples/gitt_config.h](examples/gitt_config.h) 是参考配置，移植时由移植者提供自己的文件。
 
 ## :package: 能做什么
-* **事件**：用 `gitt_push()` 把一条指令记录为纯消息提交；设备端在 `gitt_pull()` 或 `gitt_history()` 之后通过 `remote_event` 回调收到它。
-* **文件备份 / 恢复**：`gitt_commit_files()` 把一个目录树以真实的 git 对象推送上去；`gitt_pull()` 通过 `file_dump` 回调恢复文件（shallow 模式：只要最新快照；full 模式：全部历史）。
+* **文件备份 / 恢复**：`gitt_commit_files()` 把一个目录树以真实的 git 对象推送上去；`gitt_pull()` 拉取 tip 树的全新快照（depth 1）并通过 `file_dump` 回调恢复文件。设备端可以定期轮询 `gitt_pull()`，跟踪某个文件（比如状态文件）的变化。
 
 ## :book: API 一览
 * `gitt_init(g)` —— 连接一次并同步远端 head
-* `gitt_pull(g)` —— 拉取远端状态（shallow：最新快照；full：全部历史）
-* `gitt_push(g, message)` —— 推送一个纯消息提交（成为分支的新根节点）
+* `gitt_pull(g)` —— 拉取 tip 树的全新快照（depth 1）并恢复文件
 * `gitt_commit_files(g, files, file_num, message)` —— 推送一个带真实文件树的提交
-* `gitt_history(g)` —— 拉取全部历史
 * `gitt_end(g)` —— 释放所有资源
 
-`struct gitt` 上的可选回调：`get_date` / `get_zone`（提交时间戳）、`remote_event`（收到一个提交）、`file_dump`（恢复一个文件）。
+`struct gitt` 上的可选回调：`get_date` / `get_zone`（提交时间戳）、`file_dump`（恢复一个文件）。
 
 ## :ruler: 限制（移植）
 
@@ -59,9 +56,9 @@ Git Things 是一个用纯 C 语言实现的库，下文简称为 GITT。它最�
 | tip 树里的文件总数（所有层级） | 16 | `GITT_REPOSITORY_MAX_FILES` |
 | tip 树里的非根树数 | 8 | `GITT_REPOSITORY_MAX_TREES` |
 | 拉取文件的路径长度 | 63 字符 | `GITT_REPOSITORY_MAX_PATH` |
-| 拉取深度 depth | 255（目前：0 = 全量，1 = shallow） | `uint8_t` |
+| 拉取深度 depth | 1（永远是 tip 树） | 设计固定 |
 
-历史中的提交数量没有硬性上限：受 64 个对象拉取存储的限制，可拉取的历史满足 提交数 + 树数 + blob 数 ≤ 64。
+拉取永远只要 tip 树（depth 1）：64 个对象的拉取存储限制的是单次快照的大小（提交 + 树 + blob ≤ 64）。
 
 其他移植说明：
 * 用户 buffer 至少 20 字节；push blob 需要约 1035 字节（1024 字节的压缩分块 + 约 11 字节 zlib 开销）。示例使用 4096 字节。

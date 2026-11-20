@@ -50,72 +50,6 @@
 /* SHA-1 hex string length, chars (no NUL) */
 #define GITT_SHA1_HEX_SIZE	40
 
-static void gitt_repository_commit_dump(struct gitt_repository *repository,
-					struct gitt_commit *commit)
-{
-	struct gitt *g = gitt_containerof(repository, struct gitt, repository);
-	struct gitt_device device = {0};
-	char *p;
-	char *version;
-	char *flag;
-	/* Debug output */
-	gitt_log_debug("id.sha1        : %s\n", commit->id.sha1        );
-	gitt_log_debug("tree.sha1      : %s\n", commit->tree.sha1      );
-	gitt_log_debug("parent.sha1    : %s\n", commit->parent.sha1    );
-	gitt_log_debug("author.date    : %s\n", commit->author.date    );
-	gitt_log_debug("author.email   : %s\n", commit->author.email   );
-	gitt_log_debug("author.name    : %s\n", commit->author.name    );
-	gitt_log_debug("author.zone    : %s\n", commit->author.zone    );
-	gitt_log_debug("committer.date : %s\n", commit->committer.date );
-	gitt_log_debug("committer.email: %s\n", commit->committer.email);
-	gitt_log_debug("committer.name : %s\n", commit->committer.name );
-	gitt_log_debug("committer.zone : %s\n", commit->committer.zone );
-	gitt_log_debug("message        : ");
-	gitt_log_debug("%s\n", commit->message);
-	gitt_log_debug("\n");
-
-	/*
-	 * Split the author email ("<id>@<version>.GITT") into id,
-	 * version and flag for the debug output; the last two are
-	 * reserved for future use
-	 */
-	p = commit->author.email;
-	version = "unknown";
-	flag = "unknown";
-	while (*p) {
-		if (*p == '@') {
-			*p = '\0';
-			version = p + 1;
-		} else if (*p == '.') {
-			*p = '\0';
-			flag = p + 1;
-		}
-
-		p++;
-	}
-	gitt_log_debug("GITT version:%s, flag:%s\n", version, flag);
-
-	/* Fill name */
-	if (strlen(commit->author.name) > GITT_DEVICE_NAME_SIZE - 1) {
-		gitt_log_error("Name is too long\n");
-		return;
-	}
-	strcpy(device.name, commit->author.name);
-
-	/* Fill id */
-	if (strlen(commit->author.email) > GITT_DEVICE_ID_SIZE - 1) {
-		gitt_log_error("Email is too long\n");
-		return;
-	}
-	strcpy(device.id, commit->author.email);
-
-	/* Callback */
-	if (g->remote_event) {
-		g->remote_event(g, &device, commit->author.date,
-				commit->author.zone, commit->message);
-	}
-}
-
 static void gitt_repository_blob_dump(struct gitt_repository *repository,
 				      char *path, uint8_t *data, uint32_t size)
 {
@@ -145,7 +79,6 @@ int gitt_init(struct gitt *g)
 	g->repository.url = g->url;
 	g->repository.buf = g->buf;
 	g->repository.buf_len = g->buf_len;
-	g->repository.commit_dump = gitt_repository_commit_dump;
 	g->repository.blob_dump = gitt_repository_blob_dump;
 
 	ret = gitt_repository_init(&g->repository);
@@ -169,7 +102,10 @@ err0:
 }
 
 /**
- * @brief Pull the repository (fetch the latest state from remote)
+ * @brief Pull the repository (fetch the latest file snapshot from remote)
+ *
+ * Always a fresh shallow snapshot of the tip tree (depth 1); the
+ * restored files are passed to the file_dump callback.
  *
  * @param g struct gitt
  * @return int     0: no error
@@ -184,8 +120,6 @@ int gitt_pull(struct gitt *g)
 		return -GITT_ERRNO_INVAL;
 	}
 
-	g->repository.shallow = g->shallow;
-
 	ret = gitt_repository_pull(&g->repository);
 	if (ret) {
 		gitt_log_error("Pull the repository fail\n");
@@ -193,129 +127,6 @@ int gitt_pull(struct gitt *g)
 	}
 
 	return 0;
-}
-
-/**
- * @brief Push a message-only commit to the remote repository
- *
- * The commit carries no files (its tree is the empty tree); it only
- * records 'message'.
- *
- * @param g struct gitt
- * @param message the commit message
- * @return int     0: no error
- * @return int other: error
- */
-int gitt_push(struct gitt *g, char *message)
-{
-	int retval;
-	int ret;
-	int count;
-	struct gitt_commit commit = {0};
-	char date[GITT_COMMIT_DATE_SIZE];
-	char zone[GITT_COMMIT_ZONE_SIZE];
-	char id[GITT_EMAIL_SIZE];
-
-	if (g == NULL) {
-		gitt_log_error("Pointer cannot be null\n");
-		return -GITT_ERRNO_INVAL;
-	}
-
-	if (message == NULL || !strlen(message)) {
-		gitt_log_error("Message cannot be null or empty\n");
-		return -GITT_ERRNO_INVAL;
-	}
-
-	/* Initialize commit */
-	commit.tree.sha1       = GITT_TREE_EMPTY_SHA1;
-
-	/*
-	 * A message-only commit becomes the new root of the branch
-	 * (no parent): the previous history is left as dangling commits.
-	 * File commits (gitt_commit_files) use GITT_COMMIT_AUTO_BASE
-	 * and keep the history instead.
-	 */
-	commit.parent.sha1     = GITT_COMMIT_NO_BASE;
-
-	/* Fill date */
-	if (g->get_date && !g->get_date(date, sizeof(date))) {
-		commit.author.date     = date;
-		commit.committer.date  = date;
-	} else {
-		commit.author.date     = GITT_DEFAULT_DATE;
-		commit.committer.date  = GITT_DEFAULT_DATE;
-	}
-
-	/* Fill zone */
-	if (g->get_zone && !g->get_zone(zone, sizeof(zone))) {
-		commit.author.zone     = zone;
-		commit.committer.zone  = zone;
-	} else {
-		commit.author.zone     = GITT_DEFAULT_ZONE;
-		commit.committer.zone  = GITT_DEFAULT_ZONE;
-	}
-
-	/* Fill name and email */
-	if (strlen(g->device.id)) {
-		if (snprintf(id, sizeof(id), GITT_EMAIL_FORMAT,
-				g->device.id, GITT_VERSION) >= sizeof(id)) {
-			gitt_log_error("Device id is too long\n");
-			return -GITT_ERRNO_INVAL;
-		}
-		commit.author.email    = id;
-	} else {
-		commit.author.email    = GITT_UNKNOWN_EMAIL;
-	}
-	commit.author.name     = strlen(g->device.name) ? g->device.name : GITT_UNKNOWN_NAME;
-	commit.committer.email = GITT_COMMITTER_ID;
-	commit.committer.name  = GITT_COMMITTER_NAME;
-
-	commit.message         = message;
-
-	/* Try to commit */
-	struct gitt_obj objs[2];
-	struct gitt_tree empty_tree;
-
-	memset(&empty_tree, 0, sizeof(empty_tree));
-	/*
-	 * A message-only commit points to the empty tree. The tree object
-	 * must travel with the pack, otherwise the remote repository is
-	 * left with a dangling reference ('git fsck: missing tree').
-	 */
-	objs[0].type = GITT_OBJ_TYPE_TREE;
-	objs[0].data = &empty_tree;
-	objs[0].size = 0;
-	objs[1].type = GITT_OBJ_TYPE_COMMIT;
-	objs[1].data = &commit;
-	objs[1].size = gitt_commit_length(&commit);
-
-	count = 0;
-	do {
-		retval = gitt_repository_push_commit(&g->repository, &commit,
-						      objs, 2);
-		count++;
-
-		if (retval == -GITT_ERRNO_RETRY) {
-			gitt_log_info("Retry count: %d\n", count);
-
-			/* Update */
-			ret = gitt_pull(g);
-			if (ret)
-				return ret;
-		} else {
-			gitt_log_debug("End code: %d\n", retval);
-			break;
-		}
-	} while (count < GITT_TRY_NUMBER);
-
-	if (!retval)
-		/*
-		 * A message-only commit points to an empty tree, so the
-		 * files of the device are no longer the tree of the head.
-		 */
-		g->repository.files_loaded = 0;
-
-	return retval;
 }
 
 /*
@@ -627,38 +438,8 @@ int gitt_commit_files(struct gitt *g, struct gitt_file *files,
 		}
 	} while (count < GITT_TRY_NUMBER);
 
-	if (!retval)
-		/* The pushed commit carries the file tree of the device */
-		g->repository.files_loaded = 1;
-
 	free(pool);
 	return retval;
-}
-
-/**
- * @brief Get all history in the repository
- *
- * @param g struct gitt
- * @return int     0: no error
- * @return int other: error
- */
-int gitt_history(struct gitt *g)
-{
-	int ret;
-
-	if (g == NULL) {
-		gitt_log_error("Pointer cannot be null\n");
-		return -GITT_ERRNO_INVAL;
-	}
-
-	/* History needs the full object graph, never a shallow snapshot */
-	g->repository.shallow = 0;
-
-	ret = gitt_repository_clone(&g->repository);
-	if (ret)
-		return ret;
-
-	return 0;
 }
 
 /**
@@ -672,13 +453,11 @@ void gitt_end(struct gitt *g)
 
 	g->get_date = NULL;
 	g->get_zone = NULL;
-	g->remote_event = NULL;
 	g->file_dump = NULL;
 	g->url = NULL;
 	g->privkey = NULL;
 	g->buf = NULL;
 	g->buf_len = 0;
-	g->shallow = 0;
 }
 
 /**

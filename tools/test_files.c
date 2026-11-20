@@ -59,6 +59,9 @@
 /* The file restored by a pull */
 static char test_out_dir[256];
 
+/* Number of files passed to the file_dump callback */
+static int file_dump_count;
+
 /*
  * One client (the same shape as examples/main.c)
  */
@@ -127,6 +130,10 @@ static void client_file_dump(struct gitt *g, char *path,
 	FILE *file;
 
 	(void)g;
+	(void)data;
+	(void)size;
+
+	file_dump_count++;
 
 	snprintf(full, sizeof(full), "%s/%s", test_out_dir, path);
 	mkdir_parent(full);
@@ -421,9 +428,8 @@ static int run_cmd(const char *cmd)
 }
 
 /*
- * Check that git fsck reports no broken references. 'dangling commit'
- * lines are tolerated: message-only commits carry no parent, which
- * orphans the previous history.
+ * Check that git fsck reports no broken references (every commit
+ * carries a real tree, so there must be no 'missing' objects).
  */
 static int git_fsck_no_missing(const char *repo, const char *workdir)
 {
@@ -522,7 +528,6 @@ static int client_reconnect(void)
 	client.g.buf_len = sizeof(client.buffer);
 	client.g.get_date = get_date;
 	client.g.get_zone = get_zone;
-	client.g.shallow = 1;
 	client.g.file_dump = client_file_dump;
 
 	return gitt_init(&client.g);
@@ -603,7 +608,6 @@ int main(int argc, char *argv[])
 	client.g.buf_len = sizeof(client.buffer);
 	client.g.get_date = get_date;
 	client.g.get_zone = get_zone;
-	client.g.shallow = 1;
 
 	ret = gitt_init(&client.g);
 	if (ret) {
@@ -634,37 +638,27 @@ int main(int argc, char *argv[])
 	      git_commit_count(repo) == 1 && git_fsck_no_missing(repo, workdir));
 
 	/*
-	 * 3. A fresh full (non-shallow) pull restores the tree
-	 *    byte-for-byte. The push above left this session with the
-	 *    head already up to date, so a reconnection is needed for
-	 *    the pull to actually fetch.
+	 * 3. A fresh pull restores the tree byte-for-byte. The push
+	 *    above left this session with the head already up to date,
+	 *    so a reconnection is needed for the pull to actually
+	 *    fetch.
 	 */
 	int rc = client_reconnect();
-	client.g.shallow = 0;
-	snprintf(out, sizeof(out), "%s/out_full", workdir);
+	snprintf(out, sizeof(out), "%s/out_round1", workdir);
 	mkdir(out, 0755);
 	snprintf(test_out_dir, sizeof(test_out_dir), "%s", out);
 	ret = gitt_pull(&client.g);
-	check("full pull round 1 == source (byte-for-byte)",
+	check("pull round 1 == source (byte-for-byte)",
 	      !rc && !ret && trees_identical(src, out));
 
-	/* 4. Shallow pull restores the tree byte-for-byte */
-	client.g.shallow = 1;
-	snprintf(out, sizeof(out), "%s/out_shallow", workdir);
-	mkdir(out, 0755);
-	snprintf(test_out_dir, sizeof(test_out_dir), "%s", out);
-	ret = gitt_pull(&client.g);
-	check("shallow pull round 1 == source (byte-for-byte)",
-	      !ret && trees_identical(src, out));
-
-	/* 5. A real git clone reproduces the pushed tree */
+	/* 4. A real git clone reproduces the pushed tree */
 	snprintf(out, sizeof(out), "%s/clone", workdir);
 	snprintf(cmd, sizeof(cmd), "git clone -q %s %s", repo, out);
 	run_cmd(cmd);
 	check("real git clone == source (byte-for-byte)",
 	      trees_identical(src, out));
 
-	/* 6. Round 2: modify + add + delete, push with a real parent */
+	/* 5. Round 2: modify + add + delete, push with a real parent */
 	build_tree_round2(src);
 	count = 0;
 	load_dir(src, "", files, &count);
@@ -675,43 +669,27 @@ int main(int argc, char *argv[])
 	check("server: 2 commits, git fsck clean",
 	      git_commit_count(repo) == 2 && git_fsck_no_missing(repo, workdir));
 
-	/* 7. Shallow pull of the modified tree */
+	/*
+	 * 6. Pull the modified tree. The push above left this session
+	 *    with the head already up to date, so a reconnection is
+	 *    needed for the pull to actually fetch.
+	 */
+	client_reconnect();
 	snprintf(out, sizeof(out), "%s/out_round2", workdir);
 	mkdir(out, 0755);
 	snprintf(test_out_dir, sizeof(test_out_dir), "%s", out);
 	ret = gitt_pull(&client.g);
-	check("shallow pull round 2 == source (byte-for-byte)",
+	check("pull round 2 == source (byte-for-byte)",
 	      !ret && trees_identical(src, out));
 
 	/*
-	 * 8. A message-only commit references the empty tree; the empty
-	 *    tree object travels with the pack, so the remote repository
-	 *    must stay intact (git fsck: no 'missing tree').
-	 *
-	 *    Note: message-only commits carry no parent
-	 *    (GITT_COMMIT_NO_BASE), so after such a commit 'git log'
-	 *    from HEAD shows only the message commit and the previous
-	 *    history is left dangling. This check asserts that the push
-	 *    succeeds and the repository stays intact.
+	 * 7. A pull with the head up to date and the files already
+	 *    fetched in this session is a no-op: no fetch, no dump.
 	 */
-	ret = gitt_push(&client.g, "an event");
-	check("message-only commit, git fsck clean (no dangling empty tree)",
-	      !ret && git_fsck_no_missing(repo, workdir));
-
-	/*
-	 * 9. Current semantics: after a message-only commit the tip tree
-	 *    is empty, so a pull restores zero files.
-	 */
-	snprintf(out, sizeof(out), "%s/out_event", workdir);
-	mkdir(out, 0755);
-	snprintf(test_out_dir, sizeof(test_out_dir), "%s", out);
+	file_dump_count = 0;
 	ret = gitt_pull(&client.g);
-	check("pull after a message-only commit restores the (empty) tip tree",
-	      !ret && count_files(out) == 0);
-
-	/* 10. History of the whole session */
-	ret = gitt_history(&client.g);
-	check("history", !ret);
+	check("pull with the head up to date is a no-op",
+	      !ret && file_dump_count == 0);
 
 	gitt_end(&client.g);
 

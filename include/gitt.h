@@ -34,14 +34,12 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#define GITT_VERSION			"0_90"
+#define GITT_VERSION			"1_00"
 
 struct gitt;
 
 typedef int (*gitt_get_date)(char *buf, uint8_t size);
 typedef int (*gitt_get_zone)(char *buf, uint8_t size);
-typedef void (*gitt_remote_event)(struct gitt *g, struct gitt_device *device,
-				 char *date, char *zone, char *event);
 
 /*
  * One file to be backed up (push) or restored (pull)
@@ -60,21 +58,17 @@ struct gitt {
 	struct gitt_repository repository;
 	gitt_get_date get_date;
 	gitt_get_zone get_zone;
-	gitt_remote_event remote_event;
 	gitt_file_dump file_dump;
 	char *url;
 	char *privkey;
 	uint8_t *buf;
 	uint16_t buf_len;
-	uint8_t shallow;
 };
 
 int gitt_init(struct gitt *g);
 int gitt_pull(struct gitt *g);
-int gitt_push(struct gitt *g, char *message);
 int gitt_commit_files(struct gitt *g, struct gitt_file *files,
 		      uint8_t file_num, char *message);
-int gitt_history(struct gitt *g);
 void gitt_end(struct gitt *g);
 char *gitt_version(void);
 

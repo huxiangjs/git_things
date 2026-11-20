@@ -86,35 +86,6 @@ static int gitt_repository_tree_add(struct gitt_repository *repository,
 	return 0;
 }
 
-static void gitt_obj_dump_callback(struct gitt_obj *obj)
-{
-	struct gitt_commit commit = {0};
-	struct gitt_unpack *unpack = gitt_containerof(obj, struct gitt_unpack, obj);
-	struct gitt_repository *repository = gitt_containerof(unpack, struct gitt_repository, unpack);
-	int ret;
-
-	if (obj->type != GITT_OBJ_TYPE_COMMIT)
-		/* Trees and blobs are handled in gitt_repository_checkout() */
-		return;
-
-	ret = gitt_commit_parse(obj->data, (uint16_t)obj->size, &commit);
-	if (ret)
-		return;
-
-	repository->commit_dump(repository, &commit);
-
-	/*
-	 * Remember the root tree of the tip commit only. The pack can
-	 * contain other commits (the parent in a shallow fetch, older
-	 * history in a full fetch) and none of them must overwrite the
-	 * tree of the tip.
-	 */
-	if (!strcmp(obj->sha1, repository->head)) {
-		if (strlen(commit.tree.sha1))
-			strcpy(repository->root_tree_sha1, commit.tree.sha1);
-	}
-}
-
 /*
  * Restore the file tree from the object store
  *
@@ -313,26 +284,11 @@ int gitt_repository_init(struct gitt_repository *repository)
 
 	repository->head[0] = '\0';
 	repository->ssh = NULL;
-	repository->shallow = 0;
 	repository->files_loaded = 0;
-	repository->root_tree_sha1[0] = '\0';
 	repository->file_num = 0;
 	repository->tree_num = 0;
 
 	return 0;
-}
-
-/**
- * @brief Clone repository
- *
- * @param repository
- * @return int 0: Good
- * @return int -1: Error
- */
-int gitt_repository_clone(struct gitt_repository *repository)
-{
-	repository->head[0] = '\0';
-	return gitt_repository_pull(repository);
 }
 
 static int gitt_pack_data_dump_callback(void *p, uint8_t *buf, uint16_t size)
@@ -532,28 +488,23 @@ int gitt_repository_pull(struct gitt_repository *repository)
 	/*
 	 * Clone || Pull. A fetch is needed when:
 	 * - there is no local head yet (clone)
-	 * - the pull is shallow (a fresh snapshot is always wanted)
 	 * - the head is known but its files were never fetched in this
 	 *   session (e.g. only 'update_head' ran, as during init)
 	 * - the remote head has advanced
 	 */
 	if (!strlen(repository->head) ||
-	    repository->shallow ||
 	    !repository->files_loaded ||
 	    memcmp(repository->head, remote_head, sizeof(remote_head))) {
 		gitt_log_debug("Start %s\n",
 			       !strlen(repository->head) ? "clone" : "pull");
 
 		/*
-		 * The MCU is stateless: it keeps no objects between pulls,
-		 * so 'have' is never sent. Every fetch is a fresh snapshot
-		 * of the tip tree (an incremental pack would be missing the
-		 * blobs of the unchanged files). Shallow fetches are
-		 * repeated even when the local head already matches,
-		 * because the files themselves are not kept.
+		 * The client is stateless: it keeps no objects between
+		 * pulls, so 'have' is never sent and every fetch is a
+		 * fresh snapshot of the tip tree (an incremental pack
+		 * would be missing the blobs of the unchanged files).
 		 */
-		ret = gitt_command_want(repository->ssh, remote_head, NULL,
-					repository->shallow ? 1 : 0);
+		ret = gitt_command_want(repository->ssh, remote_head, NULL);
 		if (ret)
 			goto err0;
 
@@ -577,7 +528,7 @@ int gitt_repository_pull(struct gitt_repository *repository)
 	repository->unpack.buf = repository->buf;
 	repository->unpack.buf_len = repository->buf_len;
 	repository->unpack.header_dump = gitt_unpack_header_dump_callback;
-	repository->unpack.obj_dump = gitt_obj_dump_callback;
+	repository->unpack.obj_dump = NULL;
 	repository->unpack.verify_dump = gitt_unpack_verify_dump_callback;
 	ret = gitt_unpack_init(&repository->unpack);
 	if (ret)

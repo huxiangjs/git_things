@@ -33,8 +33,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#define GITT_TREE_EMPTY_SHA1		"4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-
 #define GITT_TREE_FILE_MODE		"100644"
 #define GITT_TREE_DIR_MODE		"40000"
 #define GITT_TREE_EXEC_MODE		"100755"

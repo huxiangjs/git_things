@@ -98,7 +98,7 @@ writes).
   first argument). The test creates and destroys a bare repository in a
   temporary directory by itself.
 * What is covered: pulling an empty repository; a tree with three
-  directory levels, a 4095 byte binary and an empty file; full and
-  shallow pulls; a real `git clone` of the pushed tree; a second push
-  with a modified, an added and a deleted file; a message-only commit
-  (whose tree is empty).
+  directory levels, a 4095 byte binary and an empty file; a pull of
+  the first and the second tree; a real `git clone` of the pushed
+  tree; a second push with a modified, an added and a deleted file;
+  a no-op pull when the head did not move.

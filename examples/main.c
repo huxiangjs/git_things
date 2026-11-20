@@ -71,31 +71,6 @@ struct cmd_item {
 	char *help;
 };
 
-static void gitt_replace(char src, char tag, char *buf, int buf_size)
-{
-	int i;
-
-	for (i = 0; i < buf_size; i++)
-		buf[i] = buf[i] == src ? tag : buf[i];
-}
-
-static void gitt_remote_event_callback(struct gitt *g, struct gitt_device *device,
-				       char *date, char *zone, char *event)
-{
-	char buf[128];
-	int len = strlen(event);
-
-	snprintf(buf, sizeof(buf), "%s <%s> %s %s: ", device->name, device->id,
-		 date, zone);
-	printf("%-64s", buf);
-
-	gitt_replace('\n', ' ', event, len);
-	if (len < 32)
-		printf("%s\n", event);
-	else
-		printf("%.*s...\n", 32, event);
-}
-
 /* Get user home */
 static int get_home(struct gitt_example *example)
 {
@@ -258,7 +233,6 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 	example->g.url = example->repository;
 	example->g.buf = example->buffer;
 	example->g.buf_len = sizeof(example->buffer);
-	example->g.remote_event = gitt_remote_event_callback;
 
 	/* These two functions are optional, you can choose not to implement them */
 	example->g.get_date = gitt_get_date_impl;
@@ -280,61 +254,6 @@ static int cmd_func_init(struct gitt_example *example, int args, char *argv[])
 	printf("Device id:   %s\n", example->g.device.id);
 
 	example->state = EXAMPLE_STATE_RUN;
-
-	return 0;
-}
-
-static int cmd_func_history(struct gitt_example *example, int args, char *argv[])
-{
-	int ret;
-
-	if (example->state != EXAMPLE_STATE_RUN) {
-		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
-		return -1;
-	}
-
-	printf("Please wait...\n");
-	ret = gitt_history(&example->g);
-	printf("History result: %s\n", GITT_ERRNO_STR(ret));
-	if (ret)
-		return -1;
-
-	return 0;
-}
-
-static int cmd_func_commit(struct gitt_example *example, int args, char *argv[])
-{
-	int ret;
-	char buff[1024];
-	int count;
-	int index;
-
-	if (example->state != EXAMPLE_STATE_RUN) {
-		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
-		return -1;
-	}
-
-	if (args < 2) {
-		fprintf(stderr, "Invalid: Please enter the event data\n");
-		return -1;
-	}
-
-	count = 0;
-	for (index = 1 ; index < args; index++) {
-		int n = snprintf(buff + count, sizeof(buff) - count, "%s ", argv[index]);
-
-		if (n < 0 || count + n >= sizeof(buff)) {
-			fprintf(stderr, "Invalid: Message too long\n");
-			return -1;
-		}
-		count += n;
-	}
-
-	printf("Please wait...\n");
-	ret = gitt_push(&example->g, buff);
-	printf("Commit event result: %s\n", GITT_ERRNO_STR(ret));
-	if (ret)
-		return -1;
 
 	return 0;
 }
@@ -546,11 +465,6 @@ static int cmd_func_pullfile(struct gitt_example *example, int args, char *argv[
 	mkdir(example->out_dir, 0755);
 
 	example->g.file_dump = gitt_file_callback;
-	/* Default: a shallow snapshot of the tip tree ('full' fetches the whole history) */
-	if (args >= 3 && !strcmp(argv[2], "full"))
-		example->g.shallow = 0;
-	else
-		example->g.shallow = 1;
 
 	printf("Please wait...\n");
 	ret = gitt_pull(&example->g);
@@ -559,26 +473,6 @@ static int cmd_func_pullfile(struct gitt_example *example, int args, char *argv[
 	if (ret)
 		return -1;
 
-	return 0;
-}
-
-static int cmd_func_shallow(struct gitt_example *example, int args, char *argv[])
-{
-	if (example->state != EXAMPLE_STATE_RUN) {
-		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
-		return -1;
-	}
-
-	if (args >= 2 && !strcmp(argv[1], "on"))
-		example->g.shallow = 1;
-	else if (args >= 2 && !strcmp(argv[1], "off"))
-		example->g.shallow = 0;
-	else {
-		fprintf(stderr, "Invalid: Please enter 'on' or 'off'\n");
-		return -1;
-	}
-
-	printf("Shallow pull: %s\n", example->g.shallow ? "on" : "off");
 	return 0;
 }
 
@@ -607,11 +501,67 @@ static int hit(void)
 	return 0;
 }
 
+/*
+ * Poll the file snapshot
+ *
+ * Every interval the loop pulls the latest snapshot (a fresh depth-1
+ * fetch of the tip tree) into the out directory and reports the file
+ * changes against the previous poll. A file is identified by its path
+ * and its blob SHA-1 (the file registry of the repository), so no file
+ * content is kept between polls.
+ */
+
+struct loop_file {
+	char path[GITT_REPOSITORY_MAX_PATH];
+	char sha1[41];
+};
+
+static struct loop_file loop_prev_files[GITT_REPOSITORY_MAX_FILES];
+static uint8_t loop_prev_num;
+
+static void loop_report_changes(struct gitt *g)
+{
+	struct gitt_repository *r = &g->repository;
+	uint8_t i, j;
+	int changed = 0;
+
+	for (i = 0; i < r->file_num; i++) {
+		for (j = 0; j < loop_prev_num; j++)
+			if (!strcmp(loop_prev_files[j].path, r->files[i].path))
+				break;
+		if (j == loop_prev_num) {
+			printf("  added:   %s\n", r->files[i].path);
+			changed = 1;
+		} else if (strcmp(loop_prev_files[j].sha1, r->files[i].sha1)) {
+			printf("  changed: %s\n", r->files[i].path);
+			changed = 1;
+		}
+	}
+	for (j = 0; j < loop_prev_num; j++) {
+		for (i = 0; i < r->file_num; i++)
+			if (!strcmp(loop_prev_files[j].path, r->files[i].path))
+				break;
+		if (i == r->file_num) {
+			printf("  deleted: %s\n", loop_prev_files[j].path);
+			changed = 1;
+		}
+	}
+	if (!changed)
+		printf("  (no change)\n");
+
+	for (i = 0; i < r->file_num; i++) {
+		strcpy(loop_prev_files[i].path, r->files[i].path);
+		strcpy(loop_prev_files[i].sha1, r->files[i].sha1);
+	}
+	loop_prev_num = r->file_num;
+}
+
 static int cmd_func_loop(struct gitt_example *example, int args, char *argv[])
 {
 	int interval = DEFAULT_LOOP_TIME;
 	int ret;
 	int count = 0;
+	int running = 1;
 
 	if (example->state != EXAMPLE_STATE_RUN) {
 		fprintf(stderr, "Invalid: Please use the initialization command to initialize first\n");
@@ -623,24 +573,34 @@ static int cmd_func_loop(struct gitt_example *example, int args, char *argv[])
 	if (interval < 1)
 		interval = 1;
 
-	printf("Interval time: %d second\n", interval);
-	printf("Entering the loop, you can press any key to end it\n");
+	if (args >= 3 && strlen(argv[2]) + 1 <= sizeof(example->out_dir))
+		strcpy(example->out_dir, argv[2]);
+	else
+		strcpy(example->out_dir, "./gitt_files");
 
-	while (1) {
-		if (!count) {
-			ret = gitt_pull(&example->g);
-			if (ret)
-				break;
+	mkdir(example->out_dir, 0755);
+	example->g.file_dump = gitt_file_callback;
+
+	loop_prev_num = 0;
+
+	printf("Polling %s every %d second(s), press any key to end\n",
+	       example->out_dir, interval);
+
+	while (running) {
+		ret = gitt_pull(&example->g);
+		if (ret)
+			printf("Pull fail: %s\n", GITT_ERRNO_STR(ret));
+		else
+			loop_report_changes(&example->g);
+
+		count = 0;
+		while (running && count < interval) {
+			if (hit())
+				running = 0;
+			else
+				sleep(1);
+			count++;
 		}
-
-		if (hit())
-			break;
-
-		sleep(1);
-		count++;
-
-		if (count >= interval)
-			count = 0;
 	}
 
 	printf("\nExit loop\n");
@@ -660,12 +620,9 @@ static int cmd_func_exit(struct gitt_example *example, int args, char *argv[])
 static struct cmd_item cmd_list[] = {
 	{"init",     cmd_func_init,     "init [repository] <privkey>  -- Initialize GITT"},
 	{"exit",     cmd_func_exit,     "exit                         -- Exit GITT"},
-	{"history",  cmd_func_history,  "history                      -- View historical events"},
-	{"commit",   cmd_func_commit,   "commit [event]               -- Commit an event (push)"},
-	{"loop",     cmd_func_loop,     "loop <time>                  -- Loop to get events"},
+	{"loop",     cmd_func_loop,     "loop <time> [dir]            -- Poll the file snapshot, report file changes"},
 	{"pushfile", cmd_func_pushfile, "pushfile <dir> [msg]         -- Back up files of a directory"},
-	{"pullfile", cmd_func_pullfile, "pullfile [dir] [full]        -- Restore the latest file snapshot"},
-	{"shallow",  cmd_func_shallow,  "shallow <on/off>             -- Enable/disable shallow pull"},
+	{"pullfile", cmd_func_pullfile, "pullfile [dir]               -- Restore the latest file snapshot"},
 	{"help",     cmd_func_help,     "help                         -- Show help"},
 };
 

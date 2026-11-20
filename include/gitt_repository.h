@@ -38,8 +38,6 @@ extern "C" {
 
 struct gitt_repository;
 
-typedef void (*gitt_repository_commit)(struct gitt_repository *repository,
-				      struct gitt_commit *commit);
 typedef void (*gitt_repository_blob)(struct gitt_repository *repository,
 				     char *path, uint8_t *data, uint32_t size);
 
@@ -62,12 +60,8 @@ struct gitt_repository {
 	char refs[GITT_REPOSITORY_REF_SIZE];
 	uint8_t *buf;
 	uint16_t buf_len;
-	gitt_repository_commit commit_dump;
 	gitt_repository_blob blob_dump;
 	struct gitt_ssh* ssh;
-
-	/* If set, the pull requests a shallow fetch (depth 1) */
-	uint8_t shallow;
 
 	/*
 	 * Set after a pull successfully restored the file tree of the
@@ -76,12 +70,6 @@ struct gitt_repository {
 	 * session (the client is stateless and keeps no objects).
 	 */
 	uint8_t files_loaded;
-
-	/*
-	 * The root tree of the tip commit, remembered while the pack
-	 * streams in (only the commit that matches the head counts)
-	 */
-	char root_tree_sha1[41];
 
 	/* File registry (path <-> SHA-1), rebuilt after every pull */
 	uint8_t file_num;
@@ -92,7 +80,6 @@ struct gitt_repository {
 };
 
 int gitt_repository_init(struct gitt_repository *repository);
-int gitt_repository_clone(struct gitt_repository *repository);
 int gitt_repository_push_commit(struct gitt_repository *repository,
 			       struct gitt_commit *commit,
 			       struct gitt_obj *objs, uint8_t obj_num);

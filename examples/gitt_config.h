@@ -34,7 +34,7 @@
  *  1. Pick the user buffer size first - it is the largest knob and
  *     bounds the largest file / object that can be pulled back.
  *  2. Check the push / pull limits against your data (files, paths,
- *     history depth).
+ *     snapshot size).
  *  3. Set the device identity and the ssh url field sizes for your
  *     network.
  *
@@ -72,7 +72,7 @@
 
 /*
  * ===================================================================
- * Push side (gitt_push / gitt_commit_files)
+ * Push side (gitt_commit_files)
  * ===================================================================
  */
 
@@ -123,13 +123,13 @@
 
 /*
  * ===================================================================
- * Pull side (gitt_pull / gitt_history)
+ * Pull side (gitt_pull)
  * ===================================================================
  */
 
 /*
  * Objects kept in the object store per pull (all types combined;
- * bounds the fetchable history: commits + trees + blobs <= this).
+ * bounds the fetched snapshot: commit + trees + blobs <= this).
  * used in: include/gitt_unpack.h
  */
 #define GITT_UNPACK_MAX_OBJECTS		64

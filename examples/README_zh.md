@@ -54,14 +54,11 @@
      ...... (Log is omitted here)
      Usage:
          init:  init [repository] <privkey>  -- Initialize GITT
-         exit:  exit                        -- Exit GITT
-      history:  history                     -- View historical events
-       commit:  commit [event]              -- Commit an event (push)
-         loop:  loop <time>                 -- Loop to get events
-     pushfile:  pushfile <dir> [msg]        -- Back up files of a directory
-     pullfile:  pullfile [dir] [full]       -- Restore the latest file snapshot
-      shallow:  shallow <on/off>            -- Enable/disable shallow pull
-         help:  help                        -- Show help
+         exit:  exit                         -- Exit GITT
+         loop:  loop <time> [dir]            -- Poll the file snapshot, report file changes
+     pushfile:  pushfile <dir> [msg]         -- Back up files of a directory
+     pullfile:  pullfile [dir]               -- Restore the latest file snapshot
+         help:  help                         -- Show help
      GITT# init git@github.com:huxiangjs/gitt_example.git
      Repository URL: git@github.com:huxiangjs/gitt_example.git
      Privkey path: /home/huxiang/.ssh/id_ed25519
@@ -80,8 +77,7 @@
      Device id:   0000000000000000
 
      GITT# loop
-     Interval time: 5 second
-     Entering the loop, you can press any key to end it
+     Polling ./gitt_files every 5 second(s), press any key to end
      ```
   3. 发送端执行以下操作：
      ```shell
@@ -91,14 +87,11 @@
      ...... (Log is omitted here)
      Usage:
          init:  init [repository] <privkey>  -- Initialize GITT
-         exit:  exit                        -- Exit GITT
-      history:  history                     -- View historical events
-       commit:  commit [event]              -- Commit an event (push)
-         loop:  loop <time>                 -- Loop to get events
-     pushfile:  pushfile <dir> [msg]        -- Back up files of a directory
-     pullfile:  pullfile [dir] [full]       -- Restore the latest file snapshot
-      shallow:  shallow <on/off>            -- Enable/disable shallow pull
-         help:  help                        -- Show help
+         exit:  exit                         -- Exit GITT
+         loop:  loop <time> [dir]            -- Poll the file snapshot, report file changes
+     pushfile:  pushfile <dir> [msg]         -- Back up files of a directory
+     pullfile:  pullfile [dir]               -- Restore the latest file snapshot
+         help:  help                         -- Show help
      GITT# init git@github.com:huxiangjs/gitt_example.git
      Repository URL: git@github.com:huxiangjs/gitt_example.git
      Privkey path: /home/huxiang/.ssh/id_ed25519
@@ -116,15 +109,16 @@
      Device name: Example Device
      Device id:   0000000000000000
 
-     GITT# commit This is test event!!
+     GITT# pushfile ./my_dir "backup of my_dir"
      Please wait...
-     Commit event result: Successful
+     Push file result: Successful
 
      GITT#
      ```
-  4. 在接收端，你将会看到如下日志：
+  4. 接收端的循环会恢复文件并报告变化：
      ```shell
-     Example Device <0000000000000000> 1701617598 +0800:   This is test event!!
+       restored ./gitt_files/hello.txt (12 bytes)
+       added:   hello.txt
      ```
 
 * 文件备份 / 恢复
@@ -139,10 +133,6 @@
      GITT# pullfile ./restored
      Please wait...
      Pull file result: Successful (files in ./restored)
-     ```
-     `pullfile` 默认是 shallow 拉取（只要最新快照）；传 `full` 则拉取全部历史：
-     ```shell
-     GITT# pullfile ./restored full
      ```
 
 ## 限制（移植参考）

@@ -55,7 +55,7 @@
 #define GITT_PKT_REF_MAX	(GITT_REPOSITORY_REF_SIZE - 1)
 
 /* Capability line of the fetch (upload-pack) request */
-#define GITT_FETCH_CAPABILITIES	" multi_ack no-progress side-band-64k ofs-delta shallow deepen-since deepen-not agent=git/2.34.1\n"
+#define GITT_FETCH_CAPABILITIES	" multi_ack no-progress side-band-64k ofs-delta shallow agent=git/2.34.1\n"
 
 /* Capability line of the push (receive-pack) request */
 #define GITT_PUSH_CAPABILITIES	"report-status-v2 side-band-64k object-format=sha1 agent=git/2.34.1"
@@ -337,9 +337,9 @@ out:
 /*
  * Read and discard server pkt-lines until a flush (0000).
  *
- * Used in shallow mode: the server answers the client's flush with the
- * shallow boundary line(s) and its own flush, which the client must
- * consume before sending 'done'.
+ * The server answers the client's flush with the shallow boundary
+ * line(s) and its own flush, which the client must consume before
+ * sending 'done'.
  */
 static int gitt_command_read_until_flush(struct gitt_ssh* ssh)
 {
@@ -371,8 +371,7 @@ static int gitt_command_read_until_flush(struct gitt_ssh* ssh)
 
 int gitt_command_want(struct gitt_ssh* ssh,
 		      char want_sha1[GITT_SHA1_HEX_SIZE + 1],
-		      char have_sha1[GITT_SHA1_HEX_SIZE + 1],
-		      uint8_t depth)
+		      char have_sha1[GITT_SHA1_HEX_SIZE + 1])
 {
 	struct line_data line[3];
 	int ret;
@@ -381,10 +380,10 @@ int gitt_command_want(struct gitt_ssh* ssh,
 	 * v1 "smart" protocol negotiation (verified against git upload-pack):
 	 *
 	 *   want <sha> <capabilities>
-	 *   [have <sha>]         (multi_ack, non-shallow)
-	 *   [deepen <depth>]     (shallow fetch)
+	 *   [have <sha>]         (multi_ack)
+	 *   deepen 1             (fetch only the tip commit, like 'git fetch --depth=1')
 	 *   0000                 (flush: ends the negotiation phase)
-	 *   <- [shallow <sha> ... 0000]  (server reply, shallow mode only)
+	 *   <- [shallow <sha> ... 0000]  (the server's shallow boundary reply)
 	 *   done
 	 *
 	 * The flush must come AFTER the want/have/deepen lines; 'have'
@@ -417,19 +416,15 @@ int gitt_command_want(struct gitt_ssh* ssh,
 	}
 
 	/*
-	 * Shallow fetch: the server will send only the <depth> most recent
-	 * commits of the wanted tip (like 'git fetch --depth=<depth>').
+	 * Shallow fetch: the server will send only the tip commit (like
+	 * 'git fetch --depth=1'). The client only ever restores the tip
+	 * tree, so anything older is not wanted.
 	 */
-	if (depth) {
-		char buf[16];
-		int len = sprintf(buf, "deepen %u\n", depth);
-
-		line[0].data = buf;
-		line[0].size = (uint16_t)len;
-		ret = gitt_command_line_write(ssh, line, 1);
-		if (ret)
-			return ret;
-	}
+	line[0].data = "deepen 1\n";
+	line[0].size = 9;
+	ret = gitt_command_line_write(ssh, line, 1);
+	if (ret)
+		return ret;
 
 	/* Flush: ends the negotiation phase */
 	ret = gitt_command_line_write(ssh, NULL, 0);
@@ -437,15 +432,12 @@ int gitt_command_want(struct gitt_ssh* ssh,
 		return ret;
 
 	/*
-	 * In shallow mode the server answers the flush with the shallow
-	 * boundary line(s) and its own flush; consume them before sending
-	 * 'done'. In other modes the server stays silent here.
+	 * The server answers the flush with the shallow boundary line(s)
+	 * and its own flush; consume them before sending 'done'.
 	 */
-	if (depth) {
-		ret = gitt_command_read_until_flush(ssh);
-		if (ret)
-			return ret;
-	}
+	ret = gitt_command_read_until_flush(ssh);
+	if (ret)
+		return ret;
 
 	line[0].data = "done\n";
 	line[0].size = 5;
