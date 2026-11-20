@@ -179,20 +179,15 @@
 #define GITT_DEVICE_ID_SIZE		32
 
 /*
- * The author fields of a commit built from a device: the email is
- * built from the device id with GITT_EMAIL_FORMAT, and the name /
- * email fall back to GITT_UNKNOWN_* when the device is unset.
+ * The identity of a commit built from a device: author and committer
+ * (like 'git commit') both carry it — the email is built from the
+ * device id with GITT_EMAIL_FORMAT, and the name / email fall back to
+ * GITT_UNKNOWN_* when the device is unset.
  * used in: src/gitt.c
  */
 #define GITT_EMAIL_FORMAT		"%s@%s.GITT"
 #define GITT_UNKNOWN_EMAIL		"UNKNOWN"
 #define GITT_UNKNOWN_NAME		"UNKNOWN"
-
-/*
- * The committer fields of every commit GITT builds. used in: src/gitt.c
- */
-#define GITT_COMMITTER_ID		"https://github.com/huxiangjs/git_things.git"
-#define GITT_COMMITTER_NAME		"GITT"
 
 /*
  * ===================================================================

@@ -377,7 +377,12 @@ int gitt_commit_files(struct gitt *g, struct gitt_file *files,
 		commit.committer.zone  = GITT_DEFAULT_ZONE;
 	}
 
-	/* Fill name and email (the id length was checked above) */
+	/*
+	 * Fill name and email (the id length was checked above). The
+	 * committer carries the same identity as the author: the device
+	 * both creates and commits the change (like 'git commit'), the
+	 * GITT library is only the code that runs on it.
+	 */
 	if (strlen(g->device.id)) {
 		snprintf(id, sizeof(id), GITT_EMAIL_FORMAT, g->device.id,
 			 GITT_VERSION);
@@ -386,8 +391,8 @@ int gitt_commit_files(struct gitt *g, struct gitt_file *files,
 		commit.author.email    = GITT_UNKNOWN_EMAIL;
 	}
 	commit.author.name     = strlen(g->device.name) ? g->device.name : GITT_UNKNOWN_NAME;
-	commit.committer.email = GITT_COMMITTER_ID;
-	commit.committer.name  = GITT_COMMITTER_NAME;
+	commit.committer.email = commit.author.email;
+	commit.committer.name  = commit.author.name;
 
 	commit.message         = message ? message : "";
 
