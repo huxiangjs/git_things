@@ -16,7 +16,7 @@ Git Things 是一个用纯 C 语言实现的库，下文简称为 GITT。它最�
 ## :rocket: 优点
 * 纯 C 语言实现，可移植到各平台。
 * 第三方依赖仅一个：zlib（以 git submodule 形式内置）。
-* 设备端无需 git 程序：GITT 自己通过 ssh 实现 git "smart" 协议（v1）——packfile 在进程内创建和解析，支持 delta 对象（OFS_DELTA / REF_DELTA）。
+* 设备端无需 git 程序：GITT 自己通过 ssh 实现 git "smart" 协议（v1）——packfile 在进程内创建和解析，支持 delta 对象（OFS_DELTA / REF_DELTA）。线上格式（发出的请求、收到的数据）见 [PROTOCOL_zh.md](PROTOCOL_zh.md)（[English](PROTOCOL.md)）。
 * 内存占用极小：协议核心不做动态分配；一次拉取最多在内存中保留 64 个接收到的对象，`gitt_commit_files()` 只用一个很小的树池（最多 8 棵树）。
 
 ## :zap: 注意事项（非常重要）

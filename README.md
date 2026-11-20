@@ -14,7 +14,7 @@ So let's forget about other servers and let's have fun! :)
 ## :rocket: Advantages
 * Implemented in pure C, portable across platforms.
 * Only one third-party dependency: zlib (vendored as a git submodule).
-* No git binary needed on the device: GITT speaks the git "smart" protocol (v1) over ssh by itself — packfiles are created and parsed in-process, delta objects (OFS_DELTA / REF_DELTA) included.
+* No git binary needed on the device: GITT speaks the git "smart" protocol (v1) over ssh by itself — packfiles are created and parsed in-process, delta objects (OFS_DELTA / REF_DELTA) included. The exact wire format (requests sent, data received) is documented in [PROTOCOL.md](PROTOCOL.md) ([中文](PROTOCOL_zh.md)).
 * Very small memory footprint: the protocol core is allocation-free; a pull keeps at most 64 received objects in memory and `gitt_commit_files()` uses one small tree pool (at most 8 trees).
 
 ## :zap: Notice (Very important)
