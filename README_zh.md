@@ -36,7 +36,7 @@ Git Things 是一个用纯 C 语言实现的库，下文简称为 GITT。它最�
 
 `struct gitt` 上的可选回调：`get_date` / `get_zone`（提交时间戳）、`file_dump`（恢复一个文件）。
 
-## :ruler: 限制（移植）
+## :pushpin: 限制（移植）
 
 库的全部限制。可配置的那些是 core 所 include 的全局配置 `<gitt_config.h>` 的宏（移植时由移植者提供自己的文件；[examples/gitt_config.h](examples/gitt_config.h) 是参考配置，每条都注明了限制在库里的真实出处）。其余由 git 协议或 C 类型限定，不可更改。以示例的 4096 字节 buffer 为例汇总如下：
 

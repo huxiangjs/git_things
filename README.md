@@ -34,7 +34,7 @@ So let's forget about other servers and let's have fun! :)
 
 Optional callbacks on `struct gitt`: `get_date` / `get_zone` (commit timestamps), `file_dump` (a restored file).
 
-## :ruler: Limits (porting)
+## :pushpin: Limits (porting)
 
 All limits of the library. The tunable ones are the macros of the global config `<gitt_config.h>` which the core includes (a port provides its own file; [examples/gitt_config.h](examples/gitt_config.h) is the reference, each entry notes where the cap is enforced). The rest are fixed by the git protocol or by C types and cannot be changed. Summary, for the example's 4096-byte buffer:
 
