@@ -35,6 +35,7 @@
 #include <gitt_type.h>
 #include <gitt_errno.h>
 #include <time.h>
+#include "gitt_config.h"
 
 #define DEFAULT_PRIVKEY_PATH		"id_ed25519"
 
@@ -49,9 +50,8 @@
 /*
  * The user buffer. It doubles as the pack/unpack work area, so a
  * single object must fit in it: the largest file GITT can pull back
- * is EXAMPLE_BUF_SIZE - 1 bytes (see EXAMPLE_MAX_FILE_SIZE).
+ * is GITT_CONFIG_MAX_OBJECT bytes. Sized in gitt_config.h.
  */
-#define EXAMPLE_BUF_SIZE		4096
 
 struct gitt_example {
 	struct gitt g;
@@ -59,7 +59,7 @@ struct gitt_example {
 	char privkey[2048];
 	char repository[64];
 	char out_dir[128];
-	uint8_t buffer[EXAMPLE_BUF_SIZE];
+	uint8_t buffer[GITT_CONFIG_BUF_SIZE];
 	int state;
 };
 
@@ -349,15 +349,14 @@ static int cmd_func_help(struct gitt_example *example, int args, char *argv[])
 }
 
 /*
- * File backup / restore (Route B: real git objects)
+ * File backup / restore (files are stored as real git objects)
  */
 
 /*
  * A file larger than the buffer cannot be pulled back by GITT (the
  * unpack writes the decompressed object into the buffer), so cap the
- * backup at the largest pullable size.
+ * backup at the largest pullable size (gitt_config.h).
  */
-#define EXAMPLE_MAX_FILE_SIZE		(EXAMPLE_BUF_SIZE - 1)
 
 /* Recursively load the files of a directory */
 static int gitt_load_dir(const char *path, const char *prefix,
@@ -405,9 +404,9 @@ static int gitt_load_dir(const char *path, const char *prefix,
 			 * A file that does not fit is an error: silently skipping
 			 * it would back up an incomplete tree.
 			 */
-			if (st.st_size > EXAMPLE_MAX_FILE_SIZE) {
+			if (st.st_size > GITT_CONFIG_MAX_OBJECT) {
 				fprintf(stderr, "File too big (max %d): %s\n",
-					EXAMPLE_MAX_FILE_SIZE, full);
+					GITT_CONFIG_MAX_OBJECT, full);
 				ret = -1;
 				break;
 			}

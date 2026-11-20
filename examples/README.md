@@ -144,3 +144,7 @@
      ```shell
      GITT# pullfile ./restored full
      ```
+
+## Limits (for porting)
+* The example's buffer is `GITT_CONFIG_BUF_SIZE` (4096) from [gitt_config.h](gitt_config.h), so the largest file GITT itself can pull back is 4095 bytes (`GITT_CONFIG_MAX_OBJECT` follows the buffer size).
+* Every tunable limit and default of the library is a macro of [gitt_config.h](gitt_config.h) — the global config the GITT core includes. When porting to a microcontroller, provide your own gitt_config.h on the include path and size the RAM from it (each entry notes where the cap is enforced in the library); the protocol-fixed limits are summarized in the READMEs' Limits sections.

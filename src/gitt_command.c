@@ -31,6 +31,39 @@
 #include <gitt_command.h>
 #include <gitt_errno.h>
 
+/*
+ * Pkt-line framing (git "smart" protocol, fixed): each line starts
+ * with a 4 char hex length (including itself); a length of 0, i.e.
+ * "0000", is the flush-pkt that ends a stream of lines
+ */
+#define GITT_PKT_LINE_SIZE	4
+#define GITT_PKT_FLUSH		"0000"
+
+/*
+ * Shortest status payload ("ok" / "ng") in
+ * gitt_command_get_push_status
+ */
+#define GITT_PKT_STATUS_MIN	2
+
+/* SHA-1 hex string length, chars (no NUL) */
+#define GITT_SHA1_HEX_SIZE	40
+
+/*
+ * The longest ref name GITT accepts, chars: the GITT_REPOSITORY_REF_SIZE
+ * byte refs buffer minus the NUL
+ */
+#define GITT_PKT_REF_MAX	(GITT_REPOSITORY_REF_SIZE - 1)
+
+/* Capability line of the fetch (upload-pack) request */
+#define GITT_FETCH_CAPABILITIES	" multi_ack no-progress side-band-64k ofs-delta shallow deepen-since deepen-not agent=git/2.34.1\n"
+
+/* Capability line of the push (receive-pack) request */
+#define GITT_PUSH_CAPABILITIES	"report-status-v2 side-band-64k object-format=sha1 agent=git/2.34.1"
+
+/* The server's shallow boundary lines start with this */
+#define GITT_SHALLOW_PREFIX		"shallow "
+#define GITT_SHALLOW_PREFIX_SIZE	(sizeof(GITT_SHALLOW_PREFIX) - 1)
+
 struct line_data {
 	char *data;
 	uint16_t size;
@@ -93,7 +126,7 @@ static int gitt_command_get_line_length(struct gitt_ssh* ssh)
 	int ret = 0;
 	int8_t half_byte;
 	uint8_t count = 0;
-	char buf[4];
+	char buf[GITT_PKT_LINE_SIZE];
 
 	/* Read 4byte */
 	ret = gitt_ssh_read(ssh, buf, sizeof(buf));
@@ -103,7 +136,7 @@ static int gitt_command_get_line_length(struct gitt_ssh* ssh)
 	}
 
 	ret = 0;
-	while (count < 4) {
+	while (count < GITT_PKT_LINE_SIZE) {
 		ret <<= 4;
 		half_byte = gitt_command_char_to_half_byte(buf[count]);
 		if (half_byte < 0)
@@ -127,11 +160,11 @@ struct gitt_ssh* gitt_command_start_upload(const char *url, const char *privkey)
 
 int gitt_command_say_byebye(struct gitt_ssh* ssh)
 {
-	const char *end = "0000\n";
+	const char *end = GITT_PKT_FLUSH "\n";
 	int ret;
 
-	ret = gitt_ssh_write(ssh, (char *)end, 5);
-	if (ret != 5) {
+	ret = gitt_ssh_write(ssh, (char *)end, GITT_PKT_LINE_SIZE + 1);
+	if (ret != GITT_PKT_LINE_SIZE + 1) {
 		gitt_log_debug("Saying goodbye went wrong\n");
 		return -GITT_ERRNO_INVAL;
 	}
@@ -139,12 +172,14 @@ int gitt_command_say_byebye(struct gitt_ssh* ssh)
 	return 0;
 }
 
-int gitt_command_get_head(struct gitt_ssh* ssh, char head[41], char refs[32])
+int gitt_command_get_head(struct gitt_ssh* ssh,
+			  char head[GITT_SHA1_HEX_SIZE + 1],
+			  char refs[GITT_REPOSITORY_REF_SIZE])
 {
 	int ret;
 	int length;
 	int index;
-	char buf[40];
+	char buf[GITT_SHA1_HEX_SIZE];
 
 	length = gitt_command_get_line_length(ssh);
 	gitt_log_debug("First line length: %dbyte\n", length);
@@ -154,16 +189,16 @@ int gitt_command_get_head(struct gitt_ssh* ssh, char head[41], char refs[32])
 		head[0] = '\0';
 		return 0;
 	}
-	if (length < 4 + 40)
+	if (length < GITT_PKT_LINE_SIZE + GITT_SHA1_HEX_SIZE)
 		return -GITT_ERRNO_INVAL;
-	length -= 4;
+	length -= GITT_PKT_LINE_SIZE;
 
 	/* Read SHA-1 */
-	ret = gitt_ssh_read(ssh, head, 40);
-	if (ret != 40)
+	ret = gitt_ssh_read(ssh, head, GITT_SHA1_HEX_SIZE);
+	if (ret != GITT_SHA1_HEX_SIZE)
 		return -GITT_ERRNO_INVAL;
-	head[40] = '\0';
-	length -= 40;
+	head[GITT_SHA1_HEX_SIZE] = '\0';
+	length -= GITT_SHA1_HEX_SIZE;
 	gitt_log_debug("HEAD: %s\n", head);
 
 	/* We don't care about the rest of the data */
@@ -192,15 +227,16 @@ int gitt_command_get_head(struct gitt_ssh* ssh, char head[41], char refs[32])
 
 		if (length == 0)
 			break;
-		else if (length < 4 + 40 + 1 + 1)
+		else if (length < GITT_PKT_LINE_SIZE + GITT_SHA1_HEX_SIZE + 1 + 1)
 			return -GITT_ERRNO_INVAL;
-		length -= 4;
+		length -= GITT_PKT_LINE_SIZE;
 
 		/* Find refs */
-		ret = gitt_ssh_read(ssh, buf, 40);
+		ret = gitt_ssh_read(ssh, buf, GITT_SHA1_HEX_SIZE);
 		if (ret <= 0) {
 			return -GITT_ERRNO_INVAL;
-		} else if (ret == 40 && !refs[0] && !memcmp(buf, head, 40)) {
+		} else if (ret == GITT_SHA1_HEX_SIZE && !refs[0] &&
+		   !memcmp(buf, head, GITT_SHA1_HEX_SIZE)) {
 			length -= ret;
 
 			/* Skip a space */
@@ -209,7 +245,7 @@ int gitt_command_get_head(struct gitt_ssh* ssh, char head[41], char refs[32])
 				return -GITT_ERRNO_INVAL;
 			length -= ret;
 
-			if (length > 31 || length < 2) {
+			if (length > GITT_PKT_REF_MAX || length < 2) {
 				gitt_log_error("Head name too long or too short\n");
 				return -GITT_ERRNO_INVAL;
 			}
@@ -250,16 +286,16 @@ static void gitt_command_set_line_length(char *line, uint16_t length)
 	 * A pkt-line with no payload is the flush-pkt "0000". (A total
 	 * length of 4 means 0 payload bytes, which is exactly that.)
 	 */
-	if (length == 4)
+	if (length == GITT_PKT_LINE_SIZE)
 		length = 0;
 
-	for (count = 0; count < 4; count++)
+	for (count = 0; count < GITT_PKT_LINE_SIZE; count++)
 		line[count] = tables[(length >> (12 - 4 * count)) & 0xf];
 }
 
 static int gitt_command_line_write(struct gitt_ssh* ssh, struct line_data *line, uint8_t part)
 {
-	char buf[5] = {0};
+	char buf[GITT_PKT_LINE_SIZE + 1] = {0};
 	uint16_t length;
 	int ret;
 	uint8_t i;
@@ -270,13 +306,13 @@ static int gitt_command_line_write(struct gitt_ssh* ssh, struct line_data *line,
 		length += line[i].size;
 
 	if (length)
-		length += 4;
+		length += GITT_PKT_LINE_SIZE;
 
 	/* Set the length of the line and write */
 	gitt_command_set_line_length(buf, length);
 	gitt_log_debug("%04x", length);
-	ret = gitt_ssh_write(ssh, buf, 4);
-	if (ret != 4) {
+	ret = gitt_ssh_write(ssh, buf, GITT_PKT_LINE_SIZE);
+	if (ret != GITT_PKT_LINE_SIZE) {
 		gitt_log_debug("Error writing line, at %d\n", __LINE__);
 		return -GITT_ERRNO_INVAL;
 	}
@@ -317,7 +353,7 @@ static int gitt_command_read_until_flush(struct gitt_ssh* ssh)
 			return -GITT_ERRNO_INVAL;
 		if (length == 0)
 			break;
-		length -= 4;
+		length -= GITT_PKT_LINE_SIZE;
 
 		while (length) {
 			ret = sizeof(buf);
@@ -333,7 +369,9 @@ static int gitt_command_read_until_flush(struct gitt_ssh* ssh)
 	return 0;
 }
 
-int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[41],
+int gitt_command_want(struct gitt_ssh* ssh,
+		      char want_sha1[GITT_SHA1_HEX_SIZE + 1],
+		      char have_sha1[GITT_SHA1_HEX_SIZE + 1],
 		      uint8_t depth)
 {
 	struct line_data line[3];
@@ -360,8 +398,8 @@ int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[4
 	line[0].data = "want ";
 	line[0].size = 5;
 	line[1].data = want_sha1;
-	line[1].size = 40;
-	line[2].data = " multi_ack no-progress side-band-64k ofs-delta shallow deepen-since deepen-not agent=git/2.34.1\n";
+	line[1].size = GITT_SHA1_HEX_SIZE;
+	line[2].data = GITT_FETCH_CAPABILITIES;
 	line[2].size = (uint16_t)strlen(line[2].data);
 	ret = gitt_command_line_write(ssh, line, 3);
 	if (ret)
@@ -372,7 +410,7 @@ int gitt_command_want(struct gitt_ssh* ssh, char want_sha1[41], char have_sha1[4
 		line[0].data = "have ";
 		line[0].size = 5;
 		line[1].data = have_sha1;
-		line[1].size = 40;
+		line[1].size = GITT_SHA1_HEX_SIZE;
 		ret = gitt_command_line_write(ssh, line, 2);
 		if (ret)
 			return ret;
@@ -437,7 +475,7 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 			return -GITT_ERRNO_INVAL;
 		else if (length == 0)
 			break;
-		length -= 4;
+		length -= GITT_PKT_LINE_SIZE;
 
 		while (length) {
 			ret = sizeof(buf);
@@ -466,9 +504,13 @@ int gitt_command_get_pack(struct gitt_ssh* ssh, gitt_command_pack_dump dump, voi
 				} else if (ret >= 3 && buf[0] == 'A' && buf[1] == 'C' && buf[2] == 'K') {
 					gitt_log_debug("ACK\n");
 					type = GITT_FETCH_LINE_ACK;
-				} else if (ret >= 8 && !memcmp(buf, "shallow ", 8)) {
+				} else if (ret >= (int)GITT_SHALLOW_PREFIX_SIZE &&
+					   !memcmp(buf, GITT_SHALLOW_PREFIX,
+						   GITT_SHALLOW_PREFIX_SIZE)) {
 					/* Shallow boundary announced by the server */
-					gitt_log_debug("Shallow boundary: %.*s\n", valid - 8, pbuf + 8);
+					gitt_log_debug("Shallow boundary: %.*s\n",
+							valid - GITT_SHALLOW_PREFIX_SIZE,
+							pbuf + GITT_SHALLOW_PREFIX_SIZE);
 					type = GITT_FETCH_LINE_SHALLOW;
 				} else {
 					if (buf[0] >= '0' && buf[0] <= 'z')
@@ -503,18 +545,18 @@ int gitt_command_set_pack(struct gitt_ssh* ssh, const char *head, const char *id
 
 	/* First line */
 	line[0].data = (char *)head;
-	line[0].size = 40;
+	line[0].size = GITT_SHA1_HEX_SIZE;
 	line[1].data = " ";
 	line[1].size = 1;
 	line[2].data = (char *)id;
-	line[2].size = 40;
+	line[2].size = GITT_SHA1_HEX_SIZE;
 	line[3].data = " ";
 	line[3].size = 1;
 	line[4].data = (char *)refs;
 	line[4].size = strlen(refs);
 	line[5].data = "\0 ";
 	line[5].size = 2;
-	line[6].data = "report-status-v2 side-band-64k object-format=sha1 agent=git/2.34.1";
+	line[6].data = GITT_PUSH_CAPABILITIES;
 	line[6].size = (uint16_t)strlen(line[6].data);
 	ret = gitt_command_line_write(ssh, line, 7);
 	if (ret)
@@ -557,7 +599,7 @@ int gitt_command_get_push_status(struct gitt_ssh* ssh)
 			return -GITT_ERRNO_INVAL;
 		else if (length == 0)
 			break;
-		length -= 4;
+		length -= GITT_PKT_LINE_SIZE;
 
 		/* Read line type */
 		ret = gitt_ssh_read(ssh, &type, 1);
@@ -573,13 +615,13 @@ int gitt_command_get_push_status(struct gitt_ssh* ssh)
 				if (msg_len < 0) {
 					return -GITT_ERRNO_INVAL;
 				} else if(msg_len == 0) {
-					length -= 4;
+					length -= GITT_PKT_LINE_SIZE;
 					continue;
-				} else if (msg_len < 6) {
+				} else if (msg_len < GITT_PKT_LINE_SIZE + GITT_PKT_STATUS_MIN) {
 					return -GITT_ERRNO_INVAL;
 				}
 				length -= msg_len;
-				msg_len -= 4;
+				msg_len -= GITT_PKT_LINE_SIZE;
 				buf[0] = '\0';
 				buf[1] = '\0';
 

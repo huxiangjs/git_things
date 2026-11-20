@@ -26,6 +26,7 @@
 #define __GITT_H_
 
 #include <stdint.h>
+#include <gitt_config.h>
 #include <gitt_repository.h>
 #include <gitt_device.h>
 
@@ -45,9 +46,6 @@ typedef void (*gitt_remote_event)(struct gitt *g, struct gitt_device *device,
 /*
  * One file to be backed up (push) or restored (pull)
  */
-#define GITT_FILE_PATH_SIZE		64
-#define GITT_MAX_FILES			16
-
 struct gitt_file {
 	char path[GITT_FILE_PATH_SIZE];
 	uint8_t *data;

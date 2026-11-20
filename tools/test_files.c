@@ -23,7 +23,7 @@
  */
 
 /*
- * File round-trip test (Route B).
+ * File round-trip test.
  *
  * A directory tree is pushed to a local git server with gitt_commit_files
  * (files become real blob/tree objects) and pulled back with

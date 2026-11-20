@@ -26,6 +26,7 @@
 #define __GITT_TREE_H_
 
 #include <stdint.h>
+#include <gitt_config.h>
 #include <gitt_obj.h>
 
 #ifdef __cplusplus
@@ -33,9 +34,6 @@ extern "C" {
 #endif /* __cplusplus */
 
 #define GITT_TREE_EMPTY_SHA1		"4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-
-#define GITT_TREE_MAX_ENTRIES		16
-#define GITT_TREE_NAME_SIZE		64
 
 #define GITT_TREE_FILE_MODE		"100644"
 #define GITT_TREE_DIR_MODE		"40000"

@@ -24,6 +24,7 @@ CROSS_COMPILE :=
 CC := $(CROSS_COMPILE)gcc
 
 CFLAGS := -I../include \
+	  -I../examples \
 	  -I../third_party/zlib \
 	  -DGITT_LOG_TO_STDIO \
 	  -O2 \
@@ -107,7 +108,7 @@ test_pack: $(PACK_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@
 
 
-# Round-trip test for the file backup/restore (Route B).
+# Round-trip test for the file backup/restore.
 # Needs a local sshd, git in PATH and the user's private key; it creates
 # and destroys a bare repository in a temporary directory by itself.
 FILES_SRCS := test_files.c

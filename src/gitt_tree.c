@@ -30,6 +30,22 @@
 #include <gitt_log.h>
 #include <gitt_errno.h>
 
+/* SHA-1 digest size, bytes; hex string length, chars (no NUL) */
+#define GITT_SHA1_SIZE		20
+#define GITT_SHA1_HEX_SIZE	40
+
+/*
+ * The object id header "<type> <size>\0" (longest:
+ * "ofs_delta 4294967295")
+ */
+#define GITT_OBJECT_HEADER_SIZE	24
+
+/*
+ * Longest mode string of a tree entry (git tree format, fixed: 5 or
+ * 6 chars, e.g. "40000", "100644")
+ */
+#define GITT_TREE_MODE_MAX	6
+
 /*
  * File format of a tree object:
  * | <mode> | ' ' | <name> | '\0' | <20byte SHA-1> | (one line per entry)
@@ -55,7 +71,7 @@ static int gitt_tree_hex_to_bin(const char *hex, uint8_t *bin)
 	int i;
 	int8_t half_byte;
 
-	for (i = 0; i < 20; i++) {
+	for (i = 0; i < GITT_SHA1_SIZE; i++) {
 		half_byte = gitt_tree_half_byte(hex[i * 2]);
 		if (half_byte < 0)
 			return -GITT_ERRNO_INVAL;
@@ -100,7 +116,8 @@ uint16_t gitt_tree_length(struct gitt_tree *tree)
 
 	for (i = 0; i < tree->entry_num; i++)
 		length += (uint16_t)(strlen(tree->entries[i].mode) + 1 +
-				     strlen(tree->entries[i].name) + 1 + 20);
+				     strlen(tree->entries[i].name) + 1 +
+				     GITT_SHA1_SIZE);
 
 	return length;
 }
@@ -108,7 +125,7 @@ uint16_t gitt_tree_length(struct gitt_tree *tree)
 int gitt_tree_build(gitt_obj_data dump, void *p, struct gitt_tree *tree)
 {
 	uint8_t i;
-	uint8_t sha1_bin[20];
+	uint8_t sha1_bin[GITT_SHA1_SIZE];
 	size_t name_len;
 	int ret;
 
@@ -159,7 +176,7 @@ int gitt_tree_parse(char *buf, uint16_t size, struct gitt_tree *tree)
 {
 	uint16_t index = 0;
 	uint8_t i;
-	uint8_t sha1_bin[20];
+	uint8_t sha1_bin[GITT_SHA1_SIZE];
 	const char *tables = "0123456789abcdef";
 
 	tree->entry_num = 0;
@@ -176,9 +193,9 @@ int gitt_tree_parse(char *buf, uint16_t size, struct gitt_tree *tree)
 		entry = &tree->entries[tree->entry_num];
 
 		/* Mode: 5 or 6 chars (e.g. "40000", "100644"), then ' ' */
-		if (index + 6 > size)
+		if (index + GITT_TREE_MODE_MAX > size)
 			return -GITT_ERRNO_INVAL;
-		for (i = 0; i < 6; i++) {
+		for (i = 0; i < GITT_TREE_MODE_MAX; i++) {
 			if (buf[index] == ' ')
 				break;
 			entry->mode[i] = buf[index];
@@ -205,16 +222,16 @@ int gitt_tree_parse(char *buf, uint16_t size, struct gitt_tree *tree)
 		index++;
 
 		/* SHA-1: 20 byte */
-		if (index + 20 > size)
+		if (index + GITT_SHA1_SIZE > size)
 			return -GITT_ERRNO_INVAL;
 		memcpy(sha1_bin, buf + index, sizeof(sha1_bin));
-		index += 20;
+		index += GITT_SHA1_SIZE;
 
-		for (i = 0; i < 20; i++)
+		for (i = 0; i < GITT_SHA1_SIZE; i++)
 			snprintf(entry->sha1 + i * 2, 3, "%c%c",
 				tables[sha1_bin[i] >> 4 & 0xf],
 				tables[sha1_bin[i] & 0xf]);
-		entry->sha1[40] = '\0';
+		entry->sha1[GITT_SHA1_HEX_SIZE] = '\0';
 
 		tree->entry_num++;
 	}
@@ -230,7 +247,7 @@ static int gitt_tree_sha1_dump(void *p, uint8_t *buf, uint16_t size, bool end)
 int gitt_tree_sha1_update(struct gitt_tree *tree)
 {
 	struct gitt_sha1 sha1;
-	char front_str[16];
+	char front_str[GITT_OBJECT_HEADER_SIZE];
 	int ret;
 
 	/* The entries must be sorted before computing the SHA-1 */

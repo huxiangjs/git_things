@@ -28,6 +28,16 @@
 #include <gitt_ssh.h>
 #include <gitt_errno.h>
 
+/* Only ssh on the default port is supported; the https protocol is not */
+#define GITT_SSH_PORT		"22"
+
+/*
+ * The "git-receive-pack '<repository>'" command buffer: the exec
+ * string ("git-receive-pack" / "git-upload-pack"), the repository and
+ * the quoting, derived from the configured repository size
+ */
+#define GITT_SSH_CMD_SIZE	(GITT_SSH_REPOSITORY_SIZE + 32)
+
 /* Please implement the following interfaces according to your system type */
 struct gitt_ssh* gitt_ssh_alloc_impl(void);
 void gitt_ssh_free_impl(struct gitt_ssh *ssh);
@@ -79,7 +89,7 @@ static int gitt_ssh_url_parse(struct gitt_ssh_url *ssh_url, const char *url)
 	ssh_url->repository[j] = '\0';
 
 	/* Port: fixed to 22*/
-	strcpy(ssh_url->port, "22");
+	strcpy(ssh_url->port, GITT_SSH_PORT);
 
 	return 0;
 }
@@ -112,7 +122,7 @@ int gitt_ssh_connect(struct gitt_ssh *ssh, const char *url, const char *exec,
 {
 	struct gitt_ssh_url ssh_url;
 	int err;
-	char buffer[96];
+	char buffer[GITT_SSH_CMD_SIZE];
 
 	if (!ssh || !url || !exec || !privkey)
 		return -GITT_ERRNO_INVAL;

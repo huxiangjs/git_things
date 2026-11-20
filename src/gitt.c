@@ -37,24 +37,18 @@
 #define GITT_DEFAULT_ZONE		"+0000"
 
 /*
- * Placeholder identity of the (unknown) committer; stored in the
- * committer email field of the commit objects that GITT builds
+ * The author email, built from the device id (GITT_EMAIL_FORMAT from
+ * gitt_config.h): the id plus the fixed "@" + version + ".GITT"
+ * suffix, bytes including the NUL
  */
-#define GITT_COMMITTER_ID		"https://github.com/huxiangjs/git_things.git"
-#define GITT_COMMITTER_NAME		"GITT"
+#define GITT_EMAIL_SIZE		(GITT_DEVICE_ID_SIZE + 10)
 
-#define GITT_UNKNOWN_EMAIL		"UNKNOWN"
-#define GITT_UNKNOWN_NAME		"UNKNOWN"
+/* The author date / zone buffers, bytes including the NUL */
+#define GITT_COMMIT_DATE_SIZE	16
+#define GITT_COMMIT_ZONE_SIZE	8
 
-#define GITT_EMAIL_FORMAT		"%s@%s.GITT"
-
-#define GITT_TRY_NUMBER			5
-
-/* The maximum number of (sub)trees in one commit */
-#define GITT_MAX_TREES			8
-
-/* The maximum number of sibling directories of one directory */
-#define GITT_MAX_DIR_CHILDREN		16
+/* SHA-1 hex string length, chars (no NUL) */
+#define GITT_SHA1_HEX_SIZE	40
 
 static void gitt_repository_commit_dump(struct gitt_repository *repository,
 					struct gitt_commit *commit)
@@ -218,9 +212,9 @@ int gitt_push(struct gitt *g, char *message)
 	int ret;
 	int count;
 	struct gitt_commit commit = {0};
-	char date[16];
-	char zone[8];
-	char id[GITT_DEVICE_ID_SIZE + 10];
+	char date[GITT_COMMIT_DATE_SIZE];
+	char zone[GITT_COMMIT_ZONE_SIZE];
+	char id[GITT_EMAIL_SIZE];
 
 	if (g == NULL) {
 		gitt_log_error("Pointer cannot be null\n");
@@ -406,7 +400,7 @@ static uint8_t gitt_collect_children(struct gitt_file *files, uint8_t file_num,
 }
 
 static int gitt_build_tree(struct gitt_file *files, uint8_t file_num,
-			   char (*const blob_sha1)[41],
+			   char (*const blob_sha1)[GITT_SHA1_HEX_SIZE + 1],
 			   const char *dir,
 			   struct gitt_tree *out,
 			   struct gitt_tree *pool, uint8_t *pool_idx)
@@ -497,10 +491,10 @@ int gitt_commit_files(struct gitt *g, struct gitt_file *files,
 	uint8_t pool_idx = 0;
 	uint8_t i;
 	uint8_t obj_num = 0;
-	char date[16];
-	char zone[8];
-	char id[GITT_DEVICE_ID_SIZE + 10];
-	char blob_sha1[GITT_MAX_FILES][41];
+	char date[GITT_COMMIT_DATE_SIZE];
+	char zone[GITT_COMMIT_ZONE_SIZE];
+	char id[GITT_EMAIL_SIZE];
+	char blob_sha1[GITT_MAX_FILES][GITT_SHA1_HEX_SIZE + 1];
 
 	if (g == NULL) {
 		gitt_log_error("Pointer cannot be null\n");

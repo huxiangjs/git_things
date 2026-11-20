@@ -26,6 +26,7 @@
 #define __GITT_REPOSITORY_H_
 
 #include <stdint.h>
+#include <gitt_config.h>
 #include <gitt_unpack.h>
 #include <gitt_commit.h>
 #include <gitt_pack.h>
@@ -34,10 +35,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
-#define GITT_REPOSITORY_MAX_FILES	16
-#define GITT_REPOSITORY_MAX_PATH	64
-#define GITT_REPOSITORY_MAX_TREES	8
 
 struct gitt_repository;
 
@@ -62,7 +59,7 @@ struct gitt_repository {
 	char *url;
 	char *privkey;
 	char head[41];
-	char refs[32];
+	char refs[GITT_REPOSITORY_REF_SIZE];
 	uint8_t *buf;
 	uint16_t buf_len;
 	gitt_repository_commit commit_dump;

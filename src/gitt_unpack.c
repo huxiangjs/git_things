@@ -33,6 +33,35 @@
 #define GITT_UNPACK_STATE_STOP		0xff
 
 /*
+ * Pack file header (git pack format, fixed):
+ * | 4byte magic "PACK" | 4byte version 2 | 4byte number of objects |
+ */
+#define GITT_PACK_MAGIC		"PACK"
+#define GITT_PACK_MAGIC_SIZE	4
+#define GITT_PACK_HEADER_SIZE	12
+
+/* Minimum user buffer: the pack ends with a 20 byte SHA-1 checksum */
+#define GITT_MIN_BUF_SIZE	20
+
+/* SHA-1 digest size, bytes */
+#define GITT_SHA1_SIZE		20
+
+/*
+ * The object id header "<type> <size>\0" (longest:
+ * "ofs_delta 4294967295")
+ */
+#define GITT_OBJECT_HEADER_SIZE	24
+
+/*
+ * Delta (OFS_DELTA / REF_DELTA) payload, git pack format (fixed): the
+ * source and result sizes are little-endian, 7 bits per byte, up to 4
+ * and 3 bytes respectively; a copy with size 0 means 65536
+ */
+#define GITT_DELTA_SRC_SIZE_BYTES	4
+#define GITT_DELTA_RES_SIZE_BYTES	3
+#define GITT_DELTA_COPY_DEFAULT		0x10000
+
+/*
  * The object store
  */
 
@@ -49,12 +78,12 @@ static struct gitt_unpack_obj_entry *gitt_unpack_store_find_by_offset(struct git
 }
 
 static struct gitt_unpack_obj_entry *gitt_unpack_store_find_by_sha(struct gitt_unpack *unpack,
-								    uint8_t sha1[20])
+								    uint8_t sha1[GITT_SHA1_SIZE])
 {
 	uint8_t i;
 
 	for (i = 0; i < unpack->store_num; i++)
-		if (!memcmp(unpack->store[i].sha1, sha1, 20))
+		if (!memcmp(unpack->store[i].sha1, sha1, GITT_SHA1_SIZE))
 			return &unpack->store[i];
 
 	return NULL;
@@ -62,7 +91,7 @@ static struct gitt_unpack_obj_entry *gitt_unpack_store_find_by_sha(struct gitt_u
 
 static int gitt_unpack_store_add(struct gitt_unpack *unpack, uint32_t offset,
 				 uint8_t type, uint32_t size,
-				 uint8_t *data, uint8_t sha1[20])
+				 uint8_t *data, uint8_t sha1[GITT_SHA1_SIZE])
 {
 	struct gitt_unpack_obj_entry *entry;
 
@@ -75,7 +104,7 @@ static int gitt_unpack_store_add(struct gitt_unpack *unpack, uint32_t offset,
 	entry->offset = offset;
 	entry->type = type;
 	entry->size = size;
-	memcpy(entry->sha1, sha1, 20);
+	memcpy(entry->sha1, sha1, GITT_SHA1_SIZE);
 	entry->data = NULL;
 	if (size) {
 		entry->data = (uint8_t *)malloc(size);
@@ -136,7 +165,8 @@ static int gitt_delta_apply(const uint8_t *base, uint32_t base_size,
 	uint32_t written = 0;
 	int ret;
 
-	ret = gitt_delta_decode_size(delta, (uint16_t)delta_size, 4, &pos, &src_size);
+	ret = gitt_delta_decode_size(delta, (uint16_t)delta_size,
+				     GITT_DELTA_SRC_SIZE_BYTES, &pos, &src_size);
 	if (ret) {
 		gitt_log_error("Invalid delta: source size\n");
 		return ret;
@@ -146,7 +176,8 @@ static int gitt_delta_apply(const uint8_t *base, uint32_t base_size,
 		return -GITT_ERRNO_INVAL;
 	}
 
-	ret = gitt_delta_decode_size(delta, (uint16_t)delta_size, 3, &pos, &result_size);
+	ret = gitt_delta_decode_size(delta, (uint16_t)delta_size,
+				     GITT_DELTA_RES_SIZE_BYTES, &pos, &result_size);
 	if (ret) {
 		gitt_log_error("Invalid delta: result size\n");
 		return ret;
@@ -209,7 +240,7 @@ static int gitt_delta_apply(const uint8_t *base, uint32_t base_size,
 				break;
 			}
 			if (!cp_size)
-				cp_size = 0x10000;
+				cp_size = GITT_DELTA_COPY_DEFAULT;
 
 			if (cp_off + cp_size > base_size) {
 				gitt_log_error("Invalid delta: copy out of range\n");
@@ -242,9 +273,9 @@ static int gitt_unpack_obj_resolve(struct gitt_unpack *unpack)
 {
 	struct gitt_unpack_obj_entry *base = NULL;
 	uint8_t type = unpack->obj.type;
-	uint8_t sha1_bin[20];
+	uint8_t sha1_bin[GITT_SHA1_SIZE];
 	uint32_t res_size = 0;
-	char front_str[24];
+	char front_str[GITT_OBJECT_HEADER_SIZE];
 	struct gitt_sha1 handle;
 	int ret;
 
@@ -323,8 +354,8 @@ static int gitt_unpack_obj_resolve(struct gitt_unpack *unpack)
  */
 int gitt_unpack_init(struct gitt_unpack *unpack)
 {
-	if (!unpack->buf || unpack->buf_len < 20) {
-		gitt_log_error("Buffer cannot be empty and the length cannot be less than 20\n");
+	if (!unpack->buf || unpack->buf_len < GITT_MIN_BUF_SIZE) {
+		gitt_log_error("Buffer cannot be empty and the length cannot be less than the minimum\n");
 		return -GITT_ERRNO_INVAL;
 	}
 
@@ -342,7 +373,6 @@ int gitt_unpack_init(struct gitt_unpack *unpack)
 
 static int gitt_unpack_header_step(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
 {
-	const char *magic = "PACK";
 	uint16_t index = 0;
 
 	/*
@@ -357,8 +387,8 @@ static int gitt_unpack_header_step(struct gitt_unpack *unpack, uint8_t *data, ui
 	}
 
 	/* State: 0 ~ 3  (4byte magic) */
-	while (index < size && unpack->pack_state < 4) {
-		if (data[index] != magic[unpack->pack_state]) {
+	while (index < size && unpack->pack_state < GITT_PACK_MAGIC_SIZE) {
+		if (data[index] != GITT_PACK_MAGIC[unpack->pack_state]) {
 			unpack->pack_state = GITT_UNPACK_STATE_STOP;
 			gitt_log_error("File format is incorrect\n");
 			return -GITT_ERRNO_INVAL;
@@ -368,7 +398,7 @@ static int gitt_unpack_header_step(struct gitt_unpack *unpack, uint8_t *data, ui
 	}
 
 	/* State: 4 ~ 7  (4byte version) */
-	while (index < size && unpack->pack_state < 8) {
+	while (index < size && unpack->pack_state < GITT_PACK_HEADER_SIZE - GITT_PACK_MAGIC_SIZE) {
 		unpack->version <<= 8;
 		unpack->version |= data[index];
 		index++;
@@ -376,7 +406,7 @@ static int gitt_unpack_header_step(struct gitt_unpack *unpack, uint8_t *data, ui
 	}
 
 	/* State: 8 ~ 11  (4byte number of objects) */
-	while (index < size && unpack->pack_state < 12) {
+	while (index < size && unpack->pack_state < GITT_PACK_HEADER_SIZE) {
 		unpack->number <<= 8;
 		unpack->number |= data[index];
 		index++;
@@ -384,7 +414,7 @@ static int gitt_unpack_header_step(struct gitt_unpack *unpack, uint8_t *data, ui
 	}
 
 	/* Callback */
-	if (unpack->pack_state == 12 && unpack->header_dump)
+	if (unpack->pack_state == GITT_PACK_HEADER_SIZE && unpack->header_dump)
 		unpack->header_dump(&unpack->version, &unpack->number);
 
 	return index;
@@ -480,7 +510,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 			} else if (unpack->obj.type == GITT_OBJ_TYPE_REF_DELTA) {
 				/* 20byte SHA-1 */
 				unpack->ref_base[unpack->delta_base_idx++] = data[index++];
-				if (unpack->delta_base_idx == 20)
+				if (unpack->delta_base_idx == GITT_SHA1_SIZE)
 					unpack->obj_state = GITT_UNPACK_OBJ_STATE_DATA;
 			} else {
 				/* Do nothing, jump to the next step */
@@ -544,7 +574,7 @@ static int gitt_unpack_obj_step(struct gitt_unpack *unpack, uint8_t *data, uint1
 
 			index += in_size;
 		}
-	} while (index < size && unpack->pack_state == 12);
+	} while (index < size && unpack->pack_state == GITT_UNPACK_PACK_STATE_OBJECTS);
 
 	return index;
 
@@ -558,7 +588,7 @@ static int gitt_unpack_verify_step(struct gitt_unpack *unpack, uint8_t *data, ui
 {
 	int ret;
 	uint16_t index = 0;
-	uint8_t sha1[20];
+	uint8_t sha1[GITT_SHA1_SIZE];
 	bool pass;
 
 	/* Initialization */
@@ -616,7 +646,7 @@ int gitt_unpack_update(struct gitt_unpack *unpack, uint8_t *data, uint16_t size)
 	 */
 
 	/* State: 0 ~ 11 */
-	if (size && unpack->pack_state < 12) {
+	if (size && unpack->pack_state < GITT_UNPACK_PACK_STATE_OBJECTS) {
 		consumed = gitt_unpack_header_step(unpack, data, size);
 		if (consumed < 0) {
 			return consumed;

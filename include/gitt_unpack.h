@@ -27,6 +27,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <gitt_config.h>
 #include <gitt_sha1.h>
 #include <gitt_obj.h>
 #include <gitt_zlib.h>
@@ -34,9 +35,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
-/* The maximum number of objects kept in the object store (delta bases) */
-#define GITT_UNPACK_MAX_OBJECTS		64
 
 /*
  * The pack_state values (a byte-at-a-time state machine):

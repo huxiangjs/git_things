@@ -22,6 +22,8 @@
  * SOFTWARE.
  */
 
+#include <string.h>
+#include <gitt_config.h>
 #include <gitt_pack.h>
 #include <gitt_log.h>
 #include <gitt_errno.h>
@@ -32,11 +34,19 @@
 #define GITT_PACK_STATE_STOP		0xff
 
 /*
- * The input chunk size for compressing a blob. The working buffer
- * (pack->buf) must be able to hold the worst-case output of one chunk,
- * i.e. a stored zlib block: chunk + about 11 bytes.
+ * Pack file header (git pack format, fixed):
+ * | 4byte magic "PACK" | 4byte version 2 | 4byte number of objects |
  */
-#define GITT_PACK_BLOB_CHUNK		1024
+#define GITT_PACK_MAGIC		"PACK"
+#define GITT_PACK_MAGIC_SIZE	4
+#define GITT_PACK_VERSION	2
+#define GITT_PACK_HEADER_SIZE	12
+
+/* Minimum user buffer: the pack ends with a 20 byte SHA-1 checksum */
+#define GITT_MIN_BUF_SIZE	20
+
+/* SHA-1 digest size, bytes */
+#define GITT_SHA1_SIZE		20
 
 static int gitt_pack_data_update(struct gitt_pack *pack, uint8_t *buf, uint16_t size)
 {
@@ -59,7 +69,7 @@ int gitt_pack_init(struct gitt_pack *pack)
 {
 	int ret;
 
-	if (!pack->buf || pack->buf_len < 20) {
+	if (!pack->buf || pack->buf_len < GITT_MIN_BUF_SIZE) {
 		gitt_log_error("Buffer cannot be empty and the length cannot be less than 20\n");
 		return -GITT_ERRNO_INVAL;
 	}
@@ -68,25 +78,22 @@ int gitt_pack_init(struct gitt_pack *pack)
 	pack->state = GITT_PACK_STATE_INIT;
 
 	/* 4byte magic */
-	pack->buf[0] = 'P';
-	pack->buf[1] = 'A';
-	pack->buf[2] = 'C';
-	pack->buf[3] = 'K';
+	memcpy(pack->buf, GITT_PACK_MAGIC, GITT_PACK_MAGIC_SIZE);
 
 	/* 4byte version */
-	pack->buf[4] = 0;
-	pack->buf[5] = 0;
-	pack->buf[6] = 0;
-	pack->buf[7] = 2;
+	pack->buf[GITT_PACK_MAGIC_SIZE] = 0;
+	pack->buf[GITT_PACK_MAGIC_SIZE + 1] = 0;
+	pack->buf[GITT_PACK_MAGIC_SIZE + 2] = 0;
+	pack->buf[GITT_PACK_MAGIC_SIZE + 3] = GITT_PACK_VERSION;
 
 	/* 4byte number of objects */
-	pack->buf[8] = 0;
-	pack->buf[9] = 0;
-	pack->buf[10] = 0;
-	pack->buf[11] = pack->obj_num;
+	pack->buf[2 * GITT_PACK_MAGIC_SIZE] = 0;
+	pack->buf[2 * GITT_PACK_MAGIC_SIZE + 1] = 0;
+	pack->buf[2 * GITT_PACK_MAGIC_SIZE + 2] = 0;
+	pack->buf[2 * GITT_PACK_MAGIC_SIZE + 3] = pack->obj_num;
 
 	/* Dump */
-	ret = gitt_pack_data_update(pack, pack->buf, 12);
+	ret = gitt_pack_data_update(pack, pack->buf, GITT_PACK_HEADER_SIZE);
 	if (ret)
 		return ret;
 
@@ -220,7 +227,7 @@ done:
 			return ret;
 
 		if (pack->data_dump) {
-			ret = pack->data_dump(pack, pack->buf, 20);
+			ret = pack->data_dump(pack, pack->buf, GITT_SHA1_SIZE);
 			if (ret)
 				return ret;
 		}

@@ -30,6 +30,15 @@
 #include <string.h>
 #include <gitt_errno.h>
 
+/*
+ * The object id header "<type> <size>\0" (longest:
+ * "ofs_delta 4294967295")
+ */
+#define GITT_OBJECT_HEADER_SIZE	24
+
+/* The marker that closes a gpgsig header (PGP format, fixed) */
+#define GITT_PGP_END		"-----END PGP SIGNATURE"
+
 /* Find the nearest '\n' (forward, or backward when 'backward' is set) */
 static char *gitt_commit_find_line_end(char *buf, uint16_t size, bool backward)
 {
@@ -72,7 +81,7 @@ static int gitt_commit_sha1(char *buf, uint16_t size, struct gitt_commit_id *id)
 {
 	struct gitt_sha1 sha1;
 	int ret;
-	char front_str[16];
+	char front_str[GITT_OBJECT_HEADER_SIZE];
 
 	gitt_sha1_init(&sha1);
 
@@ -267,7 +276,8 @@ int gitt_commit_parse(char *buf, uint16_t size, struct gitt_commit *commit)
 					valid_size -= next - start + 1;
 					start = next + 1;
 				} while (valid_size > 0 &&
-				         strncmp(start, "-----END PGP SIGNATURE", 20));
+				         strncmp(start, GITT_PGP_END,
+					         sizeof(GITT_PGP_END) - 1));
 			} else {
 				next = gitt_commit_find_line_end(start, valid_size, false);
 				if (!next)
@@ -499,7 +509,7 @@ int gitt_commit_sha1_update(struct gitt_commit *commit)
 {
 	struct gitt_sha1 sha1;
 	int ret;
-	char front_str[16];
+	char front_str[GITT_OBJECT_HEADER_SIZE];
 
 	gitt_sha1_init(&sha1);
 

@@ -24,6 +24,7 @@ CROSS_COMPILE :=
 CC := $(CROSS_COMPILE)gcc
 
 CFLAGS := -I../include \
+	  -I. \
 	  -I../third_party/zlib \
 	  -O2 \
 	  -Wall \

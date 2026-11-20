@@ -28,10 +28,19 @@
 #include <gitt_log.h>
 #include <gitt_errno.h>
 
-int gitt_blob_sha1_update(const uint8_t *data, uint16_t size, char sha1[41])
+/* SHA-1 hex string length, chars (no NUL) */
+#define GITT_SHA1_HEX_SIZE	40
+
+/*
+ * The object id header "<type> <size>\0" (longest:
+ * "ofs_delta 4294967295")
+ */
+#define GITT_OBJECT_HEADER_SIZE	24
+
+int gitt_blob_sha1_update(const uint8_t *data, uint16_t size, char sha1[GITT_SHA1_HEX_SIZE + 1])
 {
 	struct gitt_sha1 handle;
-	char front_str[16];
+	char front_str[GITT_OBJECT_HEADER_SIZE];
 	int ret;
 
 	gitt_sha1_init(&handle);

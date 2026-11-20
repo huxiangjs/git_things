@@ -30,6 +30,12 @@
 #include <gitt_sha1.h>
 #include <gitt_errno.h>
 
+/* SHA-1: block size, digest size, hex string length (all in bytes /
+ * chars, SHA-1 algorithm, fixed) */
+#define GITT_SHA1_BLOCK_SIZE	64
+#define GITT_SHA1_SIZE		20
+#define GITT_SHA1_HEX_SIZE	40
+
 #define sha1_circular_shift(bits, word) \
 	(((word) << (bits)) | ((word) >> (32 - (bits))))
 
@@ -153,7 +159,7 @@ int gitt_sha1_update(struct gitt_sha1 *handle, uint8_t *data, uint32_t size)
 				handle->corrupted = 1;
 		}
 
-		if (handle->block_index == 64)
+		if (handle->block_index == GITT_SHA1_BLOCK_SIZE)
 			gitt_sha1_proc_block(handle);
 
 		data++;
@@ -166,7 +172,7 @@ static void gitt_sha1_pad(struct gitt_sha1 *handle)
 {
 	if (handle->block_index > 55) {
 		handle->block[handle->block_index++] = 0x80;
-		while (handle->block_index < 64)
+		while (handle->block_index < GITT_SHA1_BLOCK_SIZE)
 			handle->block[handle->block_index++] = 0;
 
 		gitt_sha1_proc_block(handle);
@@ -199,7 +205,7 @@ static void gitt_sha1_pad(struct gitt_sha1 *handle)
  * @return int  0: no error
  * @return int -1: error
  */
-int gitt_sha1_digest(struct gitt_sha1 *handle, uint8_t digest[20])
+int gitt_sha1_digest(struct gitt_sha1 *handle, uint8_t digest[GITT_SHA1_SIZE])
 {
 	int i;
 
@@ -211,7 +217,7 @@ int gitt_sha1_digest(struct gitt_sha1 *handle, uint8_t digest[20])
 		handle->computed = 1;
 	}
 
-	for (i = 0; i < 20; i++)
+	for (i = 0; i < GITT_SHA1_SIZE; i++)
 		digest[i] = (handle->digest[i >> 2] >> (24 - 8 * (i & 0x3))) & 0xff;
 
 	return 0;
@@ -225,9 +231,9 @@ int gitt_sha1_digest(struct gitt_sha1 *handle, uint8_t digest[20])
  * @return int  0: no error
  * @return int -1: error
  */
-int gitt_sha1_hexdigest(struct gitt_sha1 *handle, char hexdigest[41])
+int gitt_sha1_hexdigest(struct gitt_sha1 *handle, char hexdigest[GITT_SHA1_HEX_SIZE + 1])
 {
-	uint8_t digest[20];
+	uint8_t digest[GITT_SHA1_SIZE];
 	const char *tables = "0123456789abcdef";
 	int retval;
 	int i;
@@ -236,11 +242,11 @@ int gitt_sha1_hexdigest(struct gitt_sha1 *handle, char hexdigest[41])
 	if (retval)
 		return retval;
 
-	for (i = 0; i < 20; i++) {
+	for (i = 0; i < GITT_SHA1_SIZE; i++) {
 		hexdigest[i << 1] = tables[(digest[i] >> 4) & 0xf];
 		hexdigest[(i << 1) + 1] = tables[digest[i] & 0xf];
 	}
-	hexdigest[40] = '\0';
+	hexdigest[GITT_SHA1_HEX_SIZE] = '\0';
 
 	return 0;
 }

@@ -26,6 +26,7 @@
 #define __GITT_SSH_H_
 
 #include <stdint.h>
+#include <gitt_config.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,10 +35,10 @@ extern "C" {
 struct gitt_ssh;
 
 struct gitt_ssh_url {
-	char user[16];
-	char host[32];
-	char port[8];
-	char repository[64];
+	char user[GITT_SSH_USER_SIZE];
+	char host[GITT_SSH_HOST_SIZE];
+	char port[GITT_SSH_PORT_SIZE];
+	char repository[GITT_SSH_REPOSITORY_SIZE];
 };
 
 struct gitt_ssh* gitt_ssh_alloc(void);

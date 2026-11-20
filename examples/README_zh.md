@@ -144,3 +144,7 @@
      ```shell
      GITT# pullfile ./restored full
      ```
+
+## 限制（移植参考）
+* 示例的 buffer 是 [gitt_config.h](gitt_config.h) 里的 `GITT_CONFIG_BUF_SIZE`（4096），因此 GITT 自己最多只能拉回 4095 字节的文件（`GITT_CONFIG_MAX_OBJECT` 跟着 buffer 大小走）。
+* 库的全部可配置限制与默认值都是 [gitt_config.h](gitt_config.h) 的宏——core 所 include 的全局配置。移植到单片机时，在 include 路径上提供自己的 gitt_config.h，并按它评估内存（每条都注明了限制在库里的真实出处）；协议限定的限制汇总在 README 的"限制"一节。

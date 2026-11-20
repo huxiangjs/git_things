@@ -23,7 +23,7 @@ Git Things 是一个用纯 C 语言实现的库，下文简称为 GITT。它最�
 * **纯消息提交会成为分支的新根节点。** `gitt_push()` 创建的提交没有 parent，因此旧的历史会变成 dangling commit，从 HEAD 看 `git log` 只显示最新的那一个。不要把 GITT 指向一个必须完整保留 `git log` 历史的仓库。（`gitt_commit_files()` 会保留历史：它的 parent 是远端 head。）
 * 目前仅支持 git（ssh）协议，不支持 https 协议。
 * 设备端是无状态的：会话之间不保留任何对象，因此每次拉取都是 tip 树的一份全新快照。
-* 限制：一次提交最多 16 个文件（`GITT_MAX_FILES`）；单个对象（例如一个文件）必须能装进用户 buffer（4096 字节的 buffer 即每文件最大 4095 字节）；一次拉取最多在内存中保留 64 个对象（`GITT_UNPACK_MAX_OBJECTS`）。
+* 限制：见下文"限制（移植）"一节。可配置的限制与默认值是 core 所 include 的全局配置 `<gitt_config.h>` 的宏——[examples/gitt_config.h](examples/gitt_config.h) 是参考配置，移植时由移植者提供自己的文件。
 
 ## :package: 能做什么
 * **事件**：用 `gitt_push()` 把一条指令记录为纯消息提交；设备端在 `gitt_pull()` 或 `gitt_history()` 之后通过 `remote_event` 回调收到它。
@@ -38,6 +38,35 @@ Git Things 是一个用纯 C 语言实现的库，下文简称为 GITT。它最�
 * `gitt_end(g)` —— 释放所有资源
 
 `struct gitt` 上的可选回调：`get_date` / `get_zone`（提交时间戳）、`remote_event`（收到一个提交）、`file_dump`（恢复一个文件）。
+
+## :ruler: 限制（移植）
+
+库的全部限制。可配置的那些是 core 所 include 的全局配置 `<gitt_config.h>` 的宏（移植时由移植者提供自己的文件；[examples/gitt_config.h](examples/gitt_config.h) 是参考配置，每条都注明了限制在库里的真实出处）。其余由 git 协议或 C 类型限定，不可更改。以示例的 4096 字节 buffer 为例汇总如下：
+
+| 项目 | 限制 | 出处 |
+|---|---|---|
+| 每次提交的文件数 | 16 | `GITT_MAX_FILES` |
+| 文件路径 / 文件名长度 | 63 字符 | `GITT_FILE_PATH_SIZE` / `GITT_TREE_NAME_SIZE` |
+| blob 大小（push） | 65535 字节 | `uint16_t` 大小字段 |
+| 每个目录的兄弟子目录数 | 16 | `GITT_MAX_DIR_CHILDREN` |
+| 每次提交的树数（不含根树） | 8 | `GITT_MAX_TREES` |
+| 单个树的 entry 数（文件 + 子目录） | 16 | `GITT_TREE_MAX_ENTRIES` |
+| 提交 message | buffer − 11 字节（≈4085） | message 整体是一个 zlib block |
+| 一个 pack 的对象数 | 255（实际 ≤ 25） | `uint8_t` 计数器 |
+| push 冲突时的重试次数 | 5 | `GITT_TRY_NUMBER` |
+| 一次拉取内存中保留的对象数（各类型合计） | 64 | `GITT_UNPACK_MAX_OBJECTS` |
+| 单个拉取对象的大小（文件、树、提交） | buffer − 1 字节（4095） | 解压直接写进用户 buffer |
+| tip 树里的文件总数（所有层级） | 16 | `GITT_REPOSITORY_MAX_FILES` |
+| tip 树里的非根树数 | 8 | `GITT_REPOSITORY_MAX_TREES` |
+| 拉取文件的路径长度 | 63 字符 | `GITT_REPOSITORY_MAX_PATH` |
+| 拉取深度 depth | 255（目前：0 = 全量，1 = shallow） | `uint8_t` |
+
+历史中的提交数量没有硬性上限：受 64 个对象拉取存储的限制，可拉取的历史满足 提交数 + 树数 + blob 数 ≤ 64。
+
+其他移植说明：
+* 用户 buffer 至少 20 字节；push blob 需要约 1035 字节（1024 字节的压缩分块 + 约 11 字节 zlib 开销）。示例使用 4096 字节。
+* ref 名 ≤ 31 字符；设备名 / 设备 id 各 ≤ 31 字符；提交日期 ≤ 15、时区 ≤ 7。
+* 仅支持 ssh 上的 git 协议（端口 22）；tag 对象可以解析但不会被 push。
 
 ## :art: 在 Linux 上试用
 * 请参阅[示例](examples/README_zh.md)

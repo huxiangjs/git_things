@@ -31,6 +31,16 @@
 #include <gitt_repository.h>
 #include <gitt_errno.h>
 
+/* SHA-1 digest size, bytes; hex string length, chars (no NUL) */
+#define GITT_SHA1_SIZE		20
+#define GITT_SHA1_HEX_SIZE	40
+
+/* The 40 zero chars: the "no id yet" placeholder of a new ref */
+#define GITT_SHA1_ZERO		"0000000000000000000000000000000000000000"
+
+/* Minimum user buffer: the pack ends with a 20 byte SHA-1 checksum */
+#define GITT_MIN_BUF_SIZE	20
+
 /*
  * The file registry (path <-> SHA-1) helpers
  */
@@ -114,22 +124,23 @@ static void gitt_obj_dump_callback(struct gitt_obj *obj)
  * object), not while streaming.
  */
 
-static void gitt_repository_sha_to_hex(const uint8_t sha1[20], char hex[41])
+static void gitt_repository_sha_to_hex(const uint8_t sha1[GITT_SHA1_SIZE],
+				       char hex[GITT_SHA1_HEX_SIZE + 1])
 {
 	static const char *tables = "0123456789abcdef";
 	uint8_t i;
 
-	for (i = 0; i < 20; i++) {
+	for (i = 0; i < GITT_SHA1_SIZE; i++) {
 		hex[i * 2] = tables[sha1[i] >> 4];
 		hex[i * 2 + 1] = tables[sha1[i] & 0xf];
 	}
-	hex[40] = '\0';
+	hex[GITT_SHA1_HEX_SIZE] = '\0';
 }
 
 static struct gitt_unpack_obj_entry *gitt_repository_store_find(struct gitt_repository *repository,
 								uint8_t type, const char *sha1_hex)
 {
-	char hex[41];
+	char hex[GITT_SHA1_HEX_SIZE + 1];
 	uint8_t i;
 
 	for (i = 0; i < repository->unpack.store_num; i++) {
@@ -197,7 +208,7 @@ static int gitt_repository_tree_walk(struct gitt_repository *repository,
 static int gitt_repository_checkout(struct gitt_repository *repository)
 {
 	struct gitt_commit commit = {0};
-	char hex[41];
+	char hex[GITT_SHA1_HEX_SIZE + 1];
 	uint8_t i;
 	int ret;
 
@@ -271,7 +282,7 @@ static void gitt_unpack_header_dump_callback(uint32_t *version, uint32_t *number
 
 static void gitt_unpack_verify_dump_callback(bool pass, struct gitt_sha1 *sha1)
 {
-	char sha1_hex[41];
+	char sha1_hex[GITT_SHA1_HEX_SIZE + 1];
 	int ret;
 
 	gitt_log_debug("verify %s, ", pass ? "pass" : "not pass");
@@ -295,7 +306,7 @@ int gitt_repository_init(struct gitt_repository *repository)
 		return -GITT_ERRNO_INVAL;
 	}
 
-	if (!repository->buf || repository->buf_len < 20) {
+	if (!repository->buf || repository->buf_len < GITT_MIN_BUF_SIZE) {
 		gitt_log_error("Buffer cannot be empty and the length cannot be less than 20\n");
 		return -GITT_ERRNO_INVAL;
 	}
@@ -349,9 +360,9 @@ int gitt_repository_push_commit(struct gitt_repository *repository,
 {
 	int ret;
 	uint8_t i;
-	char remote_head[41];
-	char refs[32];
-	char parent[41];
+	char remote_head[GITT_SHA1_HEX_SIZE + 1];
+	char refs[GITT_REPOSITORY_REF_SIZE];
+	char parent[GITT_SHA1_HEX_SIZE + 1];
 	int auto_base = 0;
 
 	gitt_log_debug("Start connecting\n");
@@ -370,12 +381,12 @@ int gitt_repository_push_commit(struct gitt_repository *repository,
 	 */
 	{
 		int zero = 1;
-		for (i = 0; i < 40; i++)
+		for (i = 0; i < GITT_SHA1_HEX_SIZE; i++)
 			if (remote_head[i] != '0') {
 				zero = 0;
 				break;
 			}
-		if (zero && strlen(remote_head) == 40)
+		if (zero && strlen(remote_head) == GITT_SHA1_HEX_SIZE)
 			remote_head[0] = '\0';
 	}
 
@@ -417,11 +428,11 @@ int gitt_repository_push_commit(struct gitt_repository *repository,
 	 * this creates a new branch (the old id is 40 zeros).
 	 */
 	{
-		static const char zero_id[41] = "0000000000000000000000000000000000000000";
+		static const char zero_id[GITT_SHA1_HEX_SIZE + 1] = GITT_SHA1_ZERO;
 		const char *old_id = strlen(remote_head) ? remote_head : zero_id;
 		const char *ref = strlen(refs) ? refs :
 			(strlen(repository->refs) ? repository->refs :
-				"refs/heads/master");
+				GITT_DEFAULT_REF);
 
 		gitt_log_debug("Set pack\n");
 		ret = gitt_command_set_pack(repository->ssh, old_id, commit->id.sha1,
@@ -462,7 +473,7 @@ int gitt_repository_push_commit(struct gitt_repository *repository,
 		strcpy(repository->refs, refs);
 	else if (!strlen(repository->refs))
 		/* A new ref was created */
-		strcpy(repository->refs, "refs/heads/master");
+		strcpy(repository->refs, GITT_DEFAULT_REF);
 	gitt_log_debug("Head updated: %s\n", repository->head);
 
 	if (auto_base)
@@ -493,8 +504,8 @@ int gitt_repository_pull(struct gitt_repository *repository)
 	 * "something went wrong"; every checked call overwrites it.
 	 */
 	int ret = -GITT_ERRNO_INVAL;
-	char remote_head[41];
-	char refs[32];
+	char remote_head[GITT_SHA1_HEX_SIZE + 1];
+	char refs[GITT_REPOSITORY_REF_SIZE];
 
 	gitt_log_debug("Start connecting\n");
 	repository->ssh = gitt_command_start_upload(repository->url, repository->privkey);

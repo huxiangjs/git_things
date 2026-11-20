@@ -25,12 +25,11 @@
 #ifndef __GITT_DEVICE_H_
 #define __GITT_DEVICE_H_
 
+#include <gitt_config.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
-#define GITT_DEVICE_NAME_SIZE		32
-#define GITT_DEVICE_ID_SIZE		32
 
 struct gitt_device {
 	char name[GITT_DEVICE_NAME_SIZE];
